@@ -5,7 +5,7 @@ const combinacionSchema = new mongoose.Schema({
   estilo_base: { type: String },
   prendas: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Prenda' }], // Lista de prendas que forman el outfit
   generada_por_ia: { type: Boolean, default: false }, // Para distinguir outfits pre-armados de dinámicos
-  usuario_creador: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }, // Si aplica
+  usuario_creador: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }, // Si el usuario fue quien armo el outfit
   activa: { type: Boolean, default: true }
 }, {
   timestamps: true
