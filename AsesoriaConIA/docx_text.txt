@@ -1,0 +1,244 @@
+﻿Sistema de Asesoría de Imagen Mediante IA.
+Este documento consolida las definiciones técnicas, lógicas y arquitectónicas para el desarrollo de la aplicación de asesoría de imagen automatizada.
+1. Arquitectura del Sistema
+Frontend (Mobile): React Native. Responsable de la interfaz de usuario y la captura de imágenes.
+Backend (Core de Negocio): API REST en C# (.NET) o Node.js (ExpressJS). Gestiona usuarios, reglas lógicas y conexión a la base de datos.
+Microservicio de IA (Computer Vision): Python (FastAPI) implementando Google MediaPipe o YOLO-Pose para la detección de landmarks y cálculo de distancias geométricas.
+2. Modelado Matemático (Reglas de Negocio)
+2.1 Morfología Corporal
+Las proporciones se calculan mediante tres variables principales:
+S (Shoulders): Circunferencia de hombros/busto.
+W (Waist): Circunferencia de cintura.
+H (Hips): Circunferencia de cadera.
+
+Silueta
+Lógica Matemática
+Regla de Estilismo
+ 
+Triángulo (Pera)
+H &gt; S * 1.05
+Volumen superior, colores oscuros y cortes rectos inferiores.
+Triángulo Invertido
+S &gt; H * 1.05
+Volumen inferior (faldas con vuelo, pantalones anchos), cuellos en V.
+Reloj de Arena
+S ≈ H y W ≤ S * 0.75
+Prendas entalladas, seguir la línea natural, marcar cintura.
+Rectángulo
+S ≈ H y W &gt; S * 0.75
+Crear ilusión de curvas (chaquetas entalladas, cinturones).
+Óvalo (Manzana)
+W &gt; S y W &gt; H
+Prendas monocromáticas, cortes imperio, líneas verticales.
+
+2.2 Morfología Facial (Visagismo)
+Variables utilizadas: L (Longitud), F (Frente), P (Pómulos), M (Mandíbula).
+Rostro Ovalado: L ≈ 1.5 * P. Proporción ideal, admite casi cualquier tipo de cuello y accesorio.
+Rostro Redondo: L ≈ P. Requiere cuellos en V y accesorios angulares para alargar.
+3. Estrategia de Datos y Base de Datos
+3.1 Elección de Tecnología
+Se utilizará una Base de Datos No Relacional (NoSQL) como MongoDB o Firebase Firestore. Esto permite flexibilidad para manejar los atributos asimétricos de las diferentes prendas (ej. un pantalón tiene &quot;tiro&quot;, una camisa tiene &quot;escote&quot;) mediante una estructura de documentos JSON.
+3.2 Fases de Poblamiento de Datos
+Fase 1 (Prototipo/PoC): &quot;Seed Dataset&quot;. Creación manual de un archivo estático (JSON) con 30-40 prendas curadas y etiquetadas manualmente para asegurar la calidad de la demostración.
+Fase 2 (Escalado): Ingestión de datasets públicos de la industria (ej. Kaggle DeepFashion) mediante un script de transformación de datos.
+3.3 Estructura de Documento (Ejemplo NoSQL)
+{  &quot;id_prenda&quot;: &quot;PRD-001&quot;,  &quot;nombre&quot;: &quot;Blusa Cuello V Seda&quot;,  &quot;categoria&quot;: &quot;Superior&quot;,  &quot;atributos_diseno&quot;: {    &quot;tipo_cuello&quot;: &quot;V_neck&quot;,    &quot;volumen&quot;: &quot;Ligero&quot;,    &quot;corte&quot;: &quot;Entallado&quot;  },  &quot;metadata&quot;: {    &quot;color_dominante&quot;: &quot;Claro&quot;,    &quot;url_imagen&quot;: &quot;https://[IMAGEN_DE_MUESTRA]&quot;  }}    
+
+Prevención de errores y manejo de confusión y disociación de la IA en la captura de la imagen.
+1. Objetivo de la Implementación
+El presente documento define los controles preventivos y protocolos de captura necesarios en el frontend (aplicación móvil en React Native) para garantizar que el microservicio de IA reciba imágenes con datos limpios y procesables. El objetivo principal es minimizar la incertidumbre geométrica de la silueta y descartar factores ambientales que puedan corromper el cálculo de proporciones.
+
+2. Control de Entorno y Validaciones Pre-Captura
+Se implementarán filtros restrictivos de validación directamente en la interfaz de la cámara, actuando como barrera antes de enviar cualquier imagen al servidor de procesamiento.
+Situación / Error Potencial
+Solución Técnica (Implementación)
+ 
+Mala iluminación o contraluz
+Medición de niveles de exposición y brillo de fotogramas en tiempo real. Si el valor cae por debajo del umbral mínimo o detecta focos de luz traseros severos, se aplica un bloqueo dinámico del botón de captura y se emite una alerta visual: &quot;Necesitas más luz frontal para continuar&quot;.
+Motion Blur (Foto borrosa o movida)
+Cruce de datos con el acelerómetro/giroscopio del dispositivo y ejecución de una función de evaluación de enfoque rápido (varianza Laplaciana). Rechazo automático de la captura si el nivel de desenfoque en los bordes supera la tolerancia permitida.
+Fondos caóticos que confunden al modelo
+Implementación de MediaPipe Selfie Segmentation como paso previo. Recorta la silueta del usuario aislando el ruido visual y tiñe el fondo de un color sólido de alto contraste (blanco o gris claro) antes de buscar los puntos articulares.
+
+3. Protocolo de Captura (Indumentaria del Usuario)
+Para acotar las variables físicas y mantener un margen de probabilidad preciso sobre la figura real, se debe implementar un flujo de onboarding visual (pantallas introductorias) ineludible. El usuario debe aceptar las siguientes reglas de negocio antes de habilitar la cámara:
+Ropa de tela fina o ligera: Exigir prendas cuyo grosor no altere artificialmente el contorno real de la persona.
+Prohibición estricta de prendas oversize: La indumentaria sobrante no debe doblar el ancho real del torso o las extremidades, garantizando que el contorno detectado sea fiel a la anatomía.
+Zonas articulares despejadas: Instruir al usuario para descubrir el cuello y, en la medida de lo posible, los brazos, para facilitar el anclaje inicial de los puntos de referencia.
+
+4. Tratamiento de Landmarks y Falsos Positivos/Negativos
+La IA interpreta la estructura humana basándose en coordenadas espaciales clave (Landmarks). Para asegurar la calidad de la recomendación de moda, el sistema debe prever los siguientes fallos de inferencia:
+Mitigación de Falsos Positivos: Ocurre cuando el algoritmo ubica un landmark en un lugar incorrecto (ej. identificar el volumen de una manga abullonada como si fuera el límite del hombro). La mitigación de este error recae enteramente en el estricto cumplimiento del Protocolo de Captura (Sección 3).
+Mitigación de Falsos Negativos: Sucede cuando la cámara no logra encontrar el punto articular debido a la falta de contraste (ej. un usuario vistiendo un pantalón negro frente a un sofá oscuro) y devuelve un valor nulo ($H = null$). Este caso límite es resuelto estructuralmente por la validación de iluminación y la segmentación de fondo implementadas en la Sección 2.
+
+Especificación Técnica: Bucle de Retroalimentación (Feedback Loop)
+1. Objetivo de la Implementación
+El sistema actual basa sus recomendaciones en reglas matemáticas estrictas (morfología). El bucle de retroalimentación busca añadir una capa de personalización basada en los gustos individuales del usuario. El objetivo es que la base de datos aprenda qué atributos de diseño (colores, cortes, estilos) prefiere la persona, para ponderarlos positivamente o negativamente en futuras recomendaciones, evitando que la aplicación se vuelva repetitiva o sugiera prendas que, aunque sean matemáticamente correctas, no encajen con su estilo personal.
+
+2. Mecanismos de Captura de Datos (Frontend)
+Se implementarán recolectores de datos explícitos e implícitos para alimentar el motor de recomendación:
+Feedback Explícito (Primario): Interfaz tipo swipe (deslizar) para indicar agrado o desagrado inmediato sobre una prenda o combinación.
+Feedback Implícito (Avanzado):
+Asociación por Tiempo de Vista: El sistema registrará los segundos que el usuario dedica a observar una prenda específica.
+Análisis de Similitud y Combinatoria: Si el tiempo de vista es alto, se cruza con las prendas marcadas con &quot;like&quot; para identificar patrones de estilo comunes. El sistema recomendará automáticamente prendas de estilos similares, combinaciones de los mismos o propuestas híbridas que nazcan de la fusión de dos estilos por los que el usuario haya mostrado interés.
+
+3. Estructura de Base de Datos (NoSQL)
+A continuación se detalla el esquema de colecciones para un entorno NoSQL (ej. MongoDB/Firestore), diseñado para ser escalable y flexible:
+&lt;table border=&quot;1&quot; cellpadding=&quot;10&quot; cellspacing=&quot;0&quot; style=&quot;border-collapse:collapse; text-align:left; line-height: 1.25; width: 100%;&quot;&gt;
+&lt;thead&gt;
+&lt;tr&gt; 
+&lt;th style=&quot;background-color:#f3f3f3;&quot;&gt;&lt;strong&gt;Colección&lt;/strong&gt; &lt;/th&gt;
+&lt;th style=&quot;background-color:#f3f3f3;&quot;&gt;&lt;strong&gt;Propósito Principal&lt;/strong&gt;&lt;/th&gt; &lt;/tr&gt; &lt;/thead&gt;
+&lt;tbody&gt; 
+&lt;tr&gt; 
+&lt;td&gt;&lt;strong&gt;Usuarios&lt;/strong&gt;&lt;/td&gt; 
+&lt;td&gt;Perfil, medidas morfométricas (S, W, H) extraídas por la cámara y configuración de cuenta.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt; 
+&lt;td&gt; &lt;strong&gt;Prendas&lt;/strong&gt; &lt;/td&gt; 
+&lt;td&gt;Catálogo con atributos técnicos (cuello, corte, tiro) y tags de compatibilidad física.&lt;/td&gt; 
+&lt;/tr&gt; 
+&lt;tr&gt; 
+&lt;td&gt;&lt;strong&gt;Usuarios_Interacciones&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;El &quot;log&quot; de actividad: Swipes (Likes/Dislikes), tiempo de visualización y clics.&lt;/td&gt; 
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;Combinaciones (Outfits)&lt;/strong&gt;&lt;/td&gt; &lt;td&gt;Conjuntos de prendas pre-armados o generados por la fusión de estilos de interés.&lt;/td&gt; 
+&lt;/tr&gt; 
+&lt;tr&gt; &lt;td&gt;&lt;strong&gt;Estilos_Config (Nueva)&lt;/strong&gt;&lt;/td&gt; &lt;td&gt;Diccionario que define las reglas de cada estilo (ej. qué colores y cortes pertenecen al &quot;Grunge&quot;).&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+4. Lógica de Ajuste (Motor de Recomendación)
+4.1 Jerarquía de Reglas y Agencia del Usuario
+El sistema no debe ser un entorno rígido. Se permite que el usuario oriente la recomendación hacia sus gustos personales, incluso si estos se desvían de lo &quot;matemáticamente favorable&quot;.
+Flexibilidad en la Recomendación: Si un usuario persiste en elegir estilos que no corresponden a su silueta ideal (ej. un Rectángulo eligiendo ropa que no marca la cintura), el motor priorizará la satisfacción del usuario sobre la regla estética pura.
+Notificación de Desviación Estética (UX): Cuando el usuario elija un camino que no sea el óptimo para su tipo de cuerpo, el sistema mostrará un mensaje discreto e incentivador.
+Ejemplo de implementación: &quot;¡Nos encanta este estilo para ti! Ten en cuenta que este corte se aleja un poco de lo que mejor resalta tu figura, ¡pero la confianza es lo que hace que un outfit sea perfecto! ¿Quieres que sigamos explorando tus gustos o prefieres que volvamos a las sugerencias técnicas?&quot;
+
+Especificación Técnica: Diseño de Experiencia de Usuario (UI/UX) por Flujos
+Rol: Analista de Sistemas / Diseñador UX
+Tecnología Frontend Recomendada: React Native (iOS / Android)
+Este documento establece el diseño funcional, la navegación y el comportamiento interactivo de la aplicación móvil, estructurado estrictamente a través de flujos operacionales correlativos. El objetivo es maximizar la precisión de la captura de datos visuales y garantizar una experiencia de descubrimiento fluida y lúdica.
+Flujo 1: Onboarding y Preparación (Educación del Usuario)
+Este flujo se ejecuta de manera ineludible antes de otorgar acceso al hardware de la cámara del dispositivo móvil. Su propósito fundamental es mitigar errores de landmarks causados por indumentaria inadecuada o entornos caóticos.
+Pantalla 1.1: Introducción de Valor y Transparencia
+Muestra una interfaz limpia y minimalista con la propuesta de valor del sistema. Incluye de forma explícita el aviso de privacidad: &quot;Para tu seguridad, tus fotos se procesan en tiempo real en la memoria del sistema y se destruyen de inmediato. No almacenamos imágenes de tu cuerpo en ningún servidor&quot;.
+Pantalla 1.2: Guía Visual del Protocolo de Indumentaria
+Sustituye textos densos por un sistema gráfico comparativo de dos columnas:
+Permitido (🟢): Ropa ajustada al cuerpo, telas finas, remeras básicas o musculosas entalladas, calzas o pantalones que delineen la silueta real.
+Prohibido (🔴): Prendas oversize, buzos holgados, camperas infladas, bufandas o cuellos altos que bloqueen el rastreo del cuello y los hombros.
+Pantalla 1.3: Verificación del Entorno
+Instrucciones finales de preparación espacial: colocarse frente a una pared de fondo liso que contraste con el color de la ropa actual y asegurar una fuente de luz frontal uniforme. Un botón de acción principal (&quot;¡Listo, abrir cámara!&quot;) activa los permisos del sistema.
+Flujo 2: Interfaz de la Cámara Asistida (Captura Inteligente)
+Controla la interacción directa entre los sensores del dispositivo y la capa de lógica pre-captura administrada en el frontend.
+Superposición de Silueta Guía (Overlay)
+La interfaz de la cámara muestra un contorno translúcido de una figura humana en el centro de la pantalla. El usuario debe encuadrar su cuerpo (o el de la persona a evaluar) dentro de este vector para estandarizar la distancia y la escala respecto a la lente.
+Semáforo de Validación en Tiempo Real
+Indicadores dinámicos y discretos ubicados en la periferia de la pantalla cambian de estado de forma reactiva:
+Indicador de Iluminación: Evalúa la exposición del cuadro. Cambia a verde (🟢) bajo condiciones idóneas o a rojo (🔴) ante contraluz o subexposición extrema.
+Indicador de Estabilidad: Conectado al giroscopio del móvil. Se muestra en verde (🟢) si el dispositivo permanece firme y en rojo (🔴) si detecta temblores que generen desenfoque por movimiento.
+Lógica de Disparo y Bloqueo
+El botón físico de captura permanece completamente deshabilitado mientras cualquiera de los indicadores se encuentre en estado rojo (🔴). Al transcurrir 2 segundos consecutivos con todas las variables en verde (🟢) y la silueta correctamente encuadrada, el botón se ilumina y parpadea sutilmente, permitiendo el disparo manual o ejecutando un temporizador automático de captura limpia.
+Flujo 3: El Feed de Recomendaciones e Interacción
+Este flujo representa el núcleo operativo donde se despliegan los resultados calculados y se recopila el comportamiento explícito e implícito para entrenar la base de datos MongoDB.
+Pantalla de Diagnóstico Inicial
+Presenta un renderizado abstracto de líneas elegantes que simula el esqueleto de landmarks detectado (evitando mostrar la fotografía real del usuario para mantener el confort visual). Comunica la clasificación morfológica resultante con un lenguaje sofisticado y empoderador.
+Capa de Tutorial Contextual (First-Time User Experience - FTUE)
+Al ingresar por primera vez al feed de descubrimiento, el sistema bloquea temporalmente la navegación ordinaria aplicando un velo oscuro con 60% de transparencia. Una animación interactiva guía al usuario:
+Una mano animada simula un deslizamiento hacia la Derecha acompañado del mensaje explicativo: &quot;Desliza hacia este lado para guardar la prenda en tu armario y enseñarme que te encanta&quot;.
+La animación cambia hacia la Izquierda con el mensaje: &quot;Desliza hacia este lado para descartar y ver estilos o combinaciones diferentes&quot;.
+Un botón inferior de confirmación (&quot;¡Entendido!&quot;) destruye la capa de tutorial de forma permanente en el perfil de la colección Usuarios.
+Indicadores de Dirección Persistentes (Ghost Icons)
+Para garantizar que el usuario recuerde siempre la funcionalidad de los gestos sin saturar la pantalla con texto, se fijan dos iconos flotantes de muy baja opacidad (entre un 15% y 20%) en los extremos laterales:
+Ubicación de Pantalla
+Elemento Visual (Ghost Icon)
+Significado Operacional
+ 
+Margen Lateral Izquierdo
+Icono &quot;X&quot; o flecha de descarte suave
+Registrar acción como indiferencia / No me gusta. Pass de tarjeta.
+Margen Lateral Derecho
+Icono de Corazón o silueta de percha
+Registrar acción como &quot;Me gusta&quot; (Swipe Like) e impactar algoritmo.
+
+Mensaje de Desviación Estética Motivacional
+Cuando la navegación del usuario priorice de manera reiterativa prendas que la lógica matemática del backend clasifica fuera de su rango óptimo de silueta, el feed inyectará de forma fluida una tarjeta con la alerta discreta preestablecida:
+&quot;¡Nos encanta este estilo para ti! Ten en cuenta que este corte se aleja un poco de lo que resalta tu silueta, ¡pero la confianza es lo que hace al outfit perfecto! ¿Seguimos explorando estos gustos?&quot;
+
+Especificación Técnica: Marco Legal, Privacidad y Ciberseguridad
+Rol: Analista de Sistemas / Especialista en Seguridad de la Información
+Fase de Proyecto: Compliance, Privacidad y Blindaje de la Aplicación (Punto 4)
+1. Objetivo de la Implementación
+El manejo de datos biométricos (imágenes del cuerpo y rostro) y credenciales de acceso exige un estándar de protección crítico. Esta especificación establece las salvaguardas legales y las contramedidas de ciberseguridad necesarias para proteger la infraestructura contra vectores de ataque comunes (robo de identidad, inyecciones, malware) y garantizar el cumplimiento regulatorio estricto. El propósito de esta funcionalidad es mitigar la fricción del usuario (cansancio por logueo repetitivo) eliminando la necesidad de introducir manualmente las credenciales de acceso en cada sesión activa. Se diseña una capa de autenticación local utilizando el hardware biométrico del dispositivo móvil (huella dactilar, reconocimiento facial o el código de bloqueo del sistema operativo) mediante APIs nativas en React Native, incrementando la seguridad física de los datos y garantizando un acceso instantáneo al feed.
+
+2. Tratamiento de Imágenes y Datos Biométricos (Privacidad)
+Para garantizar la confianza del usuario y cumplir con las normativas internacionales de protección de datos (como GDPR o leyes locales equivalentes), se define una arquitectura de datos de &quot;Cero Retención&quot;:
+Procesamiento Efímero en RAM: Las imágenes capturadas por la aplicación móvil se transmiten cifradas al microservicio de IA en Python. El servicio procesa el fotograma directamente en la memoria RAM para extraer las variables numéricas ($S, W, H$). La foto original nunca toca el disco de almacenamiento persistente y se destruye inmediatamente tras la inferencia mediante recolección de basura forzada en el código.
+Anonimización de Atributos: La base de datos MongoDB solo almacena las coordenadas de landmarks y las distancias geométricas resultantes vinculadas a un identificador de usuario (`id_usuario`). Es matemáticamente imposible reconstruir la imagen del rostro o cuerpo a partir de los datos almacenados de forma persistente.
+3. Flujo de Experiencia de Usuario (UI/UX)
+La integración biométrica se divide en dos fases operacionales dentro de la interfaz del móvil:
+3.1 Fase A: Activación Inicial (Post-Login Exitoso)
+El usuario ingresa tradicionalmente con su correo y contraseña por primera vez.
+Tras la validación exitosa en el servidor, el sistema despliega una tarjeta contextual (Pop-up): &quot;¿Quieres ingresar más rápido la próxima vez? Activa el acceso con tu huella o reconocimiento facial.&quot;
+El usuario cuenta con las opciones de &quot;Activar&quot; u &quot;Omitir por ahora&quot;. Si selecciona &quot;Activar&quot;, el sistema invoca la API nativa del teléfono para confirmar la identidad por primera vez y guarda de manera segura el token correspondiente.
+3.2 Fase B: Accesos Subsecuentes
+Al abrir la aplicación en sesiones posteriores, en lugar de mostrar el formulario de Login, el sistema ejecuta automáticamente el sensor biométrico del dispositivo (interfaz nativa de iOS/Android).
+Si la verificación es exitosa, el usuario ingresa directamente al Feed de Recomendaciones en menos de un segundo.
+Se mantiene visible un enlace secundario de &quot;Ingresar con contraseña&quot; en caso de fallos en la lectura o preferencia del usuario.
+
+3. Arquitectura Técnica y Ciberseguridad
+Desde el punto de vista de la ingeniería de software, los datos biométricos del usuario (los mapas de la huella o del rostro) nunca son accesibles por la aplicación ni se transmiten por la red. El sistema operativo actúa como un entorno aislado y seguro.
+Componente Técnico
+Mecanismo de Implementación
+ 
+Librería Frontend
+Implementación de react-native-fingerprint-scanner o expo-local-authentication para interactuar de forma abstracta con TouchID/FaceID (iOS) y BiometricPrompt (Android).
+Almacenamiento de Llaves
+Al activar la funcionalidad, el backend emite un Refresh Token seguro de larga duración. Este token se almacena localmente en el contenedor de hardware seguro del dispositivo (iOS Keychain / Android Keystore) cifrado bajo el estándar AES-256.
+Validación del S.O.
+La llave almacenada en el hardware seguro solo se libera y se envía a la memoria de la aplicación si el sistema operativo del teléfono confirma un resultado exitoso (success: true) tras la verificación física del sensor.
+
+4. Casos Límite (Edge Cases) y Gestión de Errores
+Para asegurar la estabilidad ante imprevistos físicos o cambios en el dispositivo, se establecen las siguientes contramedidas:
+Intentos Fallidos Consecutivos: Si el sensor no reconoce la biometría tras 3 intentos seguidos (por suciedad o mala posición), la interfaz nativa se cierra automáticamente y el frontend redirige al usuario de manera fluida al formulario tradicional de contraseña sin bloquear la cuenta.
+Modificación de Biometría en el Teléfono: Si el usuario registra una nueva huella o rostro en la configuración general de su celular, las llaves previas del Keychain/Keystore se invalidan automáticamente por diseño de seguridad del S.O. La aplicación detectará esta invalidación, borrará el token local obsoleto y solicitará obligatoriamente el inicio de sesión manual para reactivar el flujo.
+Dispositivos sin Hardware Compatible: El frontend verificará la disponibilidad de sensores mediante código de control previo (isSensorAvailable). Si el dispositivo carece de hardware biométrico, el flujo se adapta de forma invisible omitiendo las invitaciones de configuración y ofreciendo únicamente el login tradicional.
+
+5. Pilares de Ciberseguridad y Blindaje Tecnológico
+A continuación, se detallan las directrices técnicas para prevenir el robo de información, mitigar malware y neutralizar vulnerabilidades en el ecosistema React Native - MongoDB:
+5.1 Autenticación Segura y Prevención de Robo de Credenciales
+Cifrado en Reposo (Servidor): Las contraseñas de los usuarios no se almacenan en texto plano bajo ninguna circunstancia. El backend implementará un algoritmo de hash adaptativo y robusto (Argon2id o Bcrypt con factor de costo mínimo de 12) combinado con un sistema de salting único por usuario.
+Almacenamiento Seguro en el Dispositivo (Mobile): Los tokens de sesión (JWT - JSON Web Tokens) generados tras el inicio de sesión exitoso no deben guardarse en el AsyncStorage estándar de React Native, ya que es vulnerable a la inspección por malware en dispositivos rooteados. Se utilizará obligatoriamente Keychain en iOS y Keystore / SharedPreferences Encryptadas en Android a través de librerías nativas seguras.
+Expiración y Rotación de Tokens: Implementación de tokens de acceso de corta duración (máximo 15 minutos) combinados con Refresh Tokens almacenados de forma segura con rotación automática para evitar el secuestro de sesiones.
+5.2 Seguridad de la API y Mitigación de Inyecciones/Malware
+Prevención de NoSQL Injection (MongoDB): Para evitar que atacantes inyecten operadores de consulta maliciosos (ej. `$gt`, `$ne`) en los campos de login o filtros de prendas, el backend sanitizará estrictamente todas las entradas utilizando un ORM/ODM estructurado (como Mongoose) o validadores de esquemas rígidos que rechacen estructuras no esperadas.
+Protección en Tránsito y SSL Pinning: Todo el tráfico entre la aplicación React Native y las APIs del backend se transportará de forma mandatoria sobre HTTPS utilizando TLS 1.3. Para mitigar ataques de intermediarios (Man-in-the-Middle o MitM) perpetrados por malwares locales que intercepten redes Wi-Fi, se implementará SSL Pinning en la aplicación móvil, forzando al cliente a validar únicamente el certificado digital específico del servidor.
+Limitación de Tasa (Rate Limiting) y DDoS: Se configurará un middleware en el backend (ej. Express-Rate-Limit) para restringir el número de solicitudes por dirección IP. Esto evita que scripts automatizados intenten adivinar contraseñas por fuerza bruta o saturen el microservicio de IA mediante subidas masivas de imágenes simuladas.
+
+6. Matriz de Riesgos y Mitigaciones
+Resumen técnico de las amenazas evaluadas y su resolución en la arquitectura del sistema:
+Vector de Amenaza
+Impacto Operativo
+Estrategia de Mitigación
+ 
+Extracción física de datos en el móvil (Malware local)
+Robo de tokens de acceso e identidad del usuario.
+Uso exclusivo de Android Keystore e iOS Keychain cifrados por hardware.
+Interceptación de red (Ataques MitM)
+Lectura de imágenes en tránsito o robo de datos de sesión.
+Cifrado TLS 1.3 estricto y validación por SSL Pinning en el Frontend.
+Ataques de Fuerza Bruta en la API
+Denegación de servicio o vulneración de cuentas por diccionario.
+Rate limiting por IP y bloqueos temporales de cuenta tras 5 intentos fallidos.
+Filtros Corruptos en Base de Datos (Inyección NoSQL)
+Acceso no autorizado al catálogo de prendas o cuentas ajenas.
+Sanitización estricta de payloads entrantes con validadores de esquemas JSON.
+
+7. Mecanismos de Consentimiento y Cumplimiento Legal
+Consentimiento Explícito Biométrico: Durante la primera instalación y antes del Flujo 1 (Onboarding), la interfaz desplegará un diálogo bloqueante donde el usuario debe marcar una casilla explícita que autorice el uso de visión artificial para la medición morfológica corporal. El texto debe desglosar de forma clara y directa el destino de los datos numéricos resultantes.
+Derecho de Supresión (Derecho al Olvido): La sección de configuración de perfil de la aplicación móvil debe incluir un botón visible de &quot;Eliminar mi cuenta&quot;. Al ejecutarse, el backend borrará de forma definitiva e irreversible el registro del usuario de la colección Usuarios, todas sus preferencias en Usuarios_Interacciones y cualquier rastro analítico del sistema en cascada.
+
+
+
