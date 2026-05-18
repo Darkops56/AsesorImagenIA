@@ -6,6 +6,7 @@ import GuideScreen from '../screens/Onboarding/GuideScreen';
 import VerificationScreen from '../screens/Onboarding/VerificationScreen';
 import AssistedCamera from '../screens/Camera/AssistedCamera';
 import FeedScreen from '../screens/Feed/FeedScreen';
+import ResultScreen from '../screens/Result/ResultScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -24,6 +25,7 @@ export default function AppNavigator() {
       
       {/* FLUJO 2: CAMARA ASISTIDA */}
       <Stack.Screen name="Camera" component={AssistedCamera} />
+      <Stack.Screen name="Result" component={ResultScreen} />
       
       {/* FLUJO 3: DISCOVERY FEED */}
       <Stack.Screen name="Feed" component={FeedScreen} />

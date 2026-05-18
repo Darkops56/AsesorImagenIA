@@ -25,6 +25,25 @@ def calcular_distancia(p1, p2):
     """Calcula la distancia Euclidiana 2D entre dos puntos normalizados (x, y)."""
     return math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2)
 
+def calcular_ancho_segmentacion(mask: np.ndarray, y_normalized: float, threshold: float = 0.5) -> float:
+    """Calcula el ancho real del cuerpo en una coordenada Y específica usando la máscara de segmentación."""
+    if mask is None:
+        return 0.0
+    
+    height, width = mask.shape
+    # Asegurar que el índice de fila esté dentro de los límites
+    row_idx = int(y_normalized * height)
+    row_idx = max(0, min(row_idx, height - 1))
+    
+    # Obtener la fila correspondiente
+    row = mask[row_idx, :]
+    
+    # Contar píxeles que superan el umbral de confianza
+    body_pixels = np.sum(row > threshold)
+    
+    # Normalizar dividiendo por el ancho total de la imagen
+    return float(body_pixels) / float(width)
+
 def validar_calidad_imagen(image_np: np.ndarray) -> dict:
     """
     Evalúa la nitidez (desenfoque) y la iluminación de la imagen.
@@ -34,18 +53,18 @@ def validar_calidad_imagen(image_np: np.ndarray) -> dict:
     
     # 1. Nitidez (Varianza del Laplaciano)
     laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-    is_sharp = laplacian_var > 100.0  # Umbral de borrosidad
+    is_sharp = bool(laplacian_var > 100.0)  # Umbral de borrosidad
 
     # 2. Iluminación (Brillo promedio)
     brightness = gray.mean()
-    is_well_lit = 40.0 < brightness < 230.0  # Evitar muy oscuro o muy sobreexpuesto
+    is_well_lit = bool(40.0 < brightness < 230.0)  # Evitar muy oscuro o muy sobreexpuesto
 
     return {
-        "is_valid": is_sharp and is_well_lit,
+        "is_valid": bool(is_sharp and is_well_lit),
         "is_sharp": is_sharp,
         "is_well_lit": is_well_lit,
-        "laplacian_var": round(laplacian_var, 2),
-        "brightness": round(brightness, 2),
+        "laplacian_var": round(float(laplacian_var), 2),
+        "brightness": round(float(brightness), 2),
         "reason": "La imagen está muy borrosa." if not is_sharp else ("La iluminación no es adecuada (muy oscura o muy brillante)." if not is_well_lit else None)
     }
 
@@ -74,19 +93,21 @@ def procesar_fotograma(image_np: np.ndarray) -> dict:
 
         # 1. Procesamiento Corporal (Pose)
         pose_results = pose.process(image_rgb)
-        if pose_results.pose_landmarks:
+        if pose_results.pose_landmarks and pose_results.segmentation_mask is not None:
             landmarks = pose_results.pose_landmarks.landmark
+            mask = pose_results.segmentation_mask
             
-            # S: Distancia entre Hombros (11 y 12)
-            s_dist = calcular_distancia(landmarks[11], landmarks[12])
+            # Obtener coordenadas Y (altura) promedio para Hombros y Caderas
+            shoulder_y = (landmarks[11].y + landmarks[12].y) / 2.0
+            hip_y = (landmarks[23].y + landmarks[24].y) / 2.0
             
-            # H: Distancia entre Caderas (23 y 24)
-            h_dist = calcular_distancia(landmarks[23], landmarks[24])
+            # Estimar la altura Y de la cintura (punto medio entre hombros y caderas)
+            waist_y = (shoulder_y + hip_y) / 2.0
             
-            # W: Cintura (No hay puntos exactos en MediaPipe, se estima)
-            # En un entorno real se usaría la segmentación (pose_results.segmentation_mask)
-            # Para este MVP matemático, se asume un punto intermedio entre hombro y cadera.
-            w_dist = s_dist * 0.8  # Placeholder lógico. En prod se calcula el contorno sobre la máscara.
+            # Calcular anchos reales usando la máscara de segmentación
+            s_dist = calcular_ancho_segmentacion(mask, shoulder_y)
+            w_dist = calcular_ancho_segmentacion(mask, waist_y)
+            h_dist = calcular_ancho_segmentacion(mask, hip_y)
             
             resultados["morfologia_corporal"] = {
                 "S": round(s_dist, 4),

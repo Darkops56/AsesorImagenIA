@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } fr
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { AI_API_URL, NODE_API_URL } from '../../../config/config';
 import * as ImagePicker from 'expo-image-picker';
-
+import * as ImageManipulator from 'expo-image-manipulator';
+import { validateImageQuality } from '../../utils/imageValidation';
 export default function AssistedCamera({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState('back');
@@ -24,7 +25,14 @@ export default function AssistedCamera({ navigation }) {
         body: JSON.stringify({ image_base64: base64Str })
       });
       
-      const aiData = await aiResponse.json();
+      const aiResponseText = await aiResponse.text();
+      let aiData;
+      try {
+        aiData = JSON.parse(aiResponseText);
+      } catch (parseError) {
+        console.error("AI API Error Response (Not JSON):", aiResponseText.substring(0, 500));
+        throw new Error(`AI API devolvió un formato inválido (HTTP ${aiResponse.status}): ${aiResponseText.substring(0, 100)}...`);
+      }
       
       // Validación de Calidad (Nitidez y Brillo)
       if (aiData.status === 'quality_error') {
@@ -49,7 +57,14 @@ export default function AssistedCamera({ navigation }) {
         body: JSON.stringify({ S, W, H }) // Modo invitado (sin usuarioId)
       });
       
-      const nodeData = await nodeResponse.json();
+      const nodeResponseText = await nodeResponse.text();
+      let nodeData;
+      try {
+        nodeData = JSON.parse(nodeResponseText);
+      } catch (parseError) {
+        console.error("Node API Error Response (Not JSON):", nodeResponseText.substring(0, 500));
+        throw new Error(`Node API devolvió un formato inválido (HTTP ${nodeResponse.status}): ${nodeResponseText.substring(0, 100)}...`);
+      }
       
       if (!nodeResponse.ok) {
         throw new Error(nodeData.error || 'Error en el servidor de Node.js');
@@ -57,12 +72,12 @@ export default function AssistedCamera({ navigation }) {
       
       Alert.alert('¡Análisis Exitoso! 🎉', `Tu silueta ha sido clasificada como: ${nodeData.silueta}`);
       
-      // 3. Navegar a la siguiente pantalla
-      navigation.replace('Feed');
+      // 3. Navegar a la pantalla de resultados
+      navigation.navigate('Result', { silueta: nodeData.silueta, imageBase64: base64Str });
 
     } catch (error) {
       console.error(error);
-      Alert.alert('Error de conexión', 'No se pudo conectar con los servidores. Verifica las URLs y tu conexión a internet.');
+      Alert.alert('Error de procesamiento', error.message || 'No se pudo conectar con los servidores.');
     } finally {
       setIsProcessing(false);
     }
@@ -72,10 +87,50 @@ export default function AssistedCamera({ navigation }) {
     if (cameraRef.current) {
       try {
         const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.7 });
-        if (photo.base64) {
+        if (photo.base64 && photo.uri) {
+          setIsProcessing(true);
+          
+          try {
+            // Resize image to small resolution for faster JS processing
+            const manipResult = await ImageManipulator.manipulateAsync(
+              photo.uri,
+              [{ resize: { width: 200 } }],
+              { base64: true, format: ImageManipulator.SaveFormat.JPEG }
+            );
+
+            if (manipResult.base64) {
+              const quality = await validateImageQuality(manipResult.base64);
+              console.log("Image Quality:", quality);
+
+              if (quality.isDark) {
+                Alert.alert('Foto muy oscura 🌑', 'Por favor, ubícate en un lugar con mejor iluminación.');
+                setIsProcessing(false);
+                return;
+              }
+
+              if (quality.isOverexposed) {
+                Alert.alert('Foto sobreexpuesta ☀️', 'Hay demasiada luz. Por favor, evita reflejos directos.');
+                setIsProcessing(false);
+                return;
+              }
+
+              if (quality.isBlurry) {
+                Alert.alert('Foto borrosa 📷', 'Por favor, mantén la cámara firme al tomar la foto.');
+                setIsProcessing(false);
+                return;
+              }
+            }
+          } catch (validationError) {
+            console.error("Error during local validation:", validationError);
+            // Si la validación local falla por alguna razón (ej. buffer error), 
+            // continuamos con el procesamiento normal para no bloquear.
+          }
+
+          // If validation passes (or fails to run but doesn't throw specific quality errors), process it
           await processImage(photo.base64);
         }
       } catch (e) {
+        setIsProcessing(false);
         Alert.alert('Error', 'No se pudo capturar la foto.');
       }
     }

@@ -12,7 +12,7 @@ class FrameRequest(BaseModel):
     image_base64: str
 
 @router.post("/process-frame")
-async def process_frame(request: FrameRequest):
+def process_frame(request: FrameRequest):
     """
     Recibe un fotograma en formato Base64.
     Lo procesa en memoria (RAM) para extraer las coordenadas morfológicas,
