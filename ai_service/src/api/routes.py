@@ -37,6 +37,12 @@ async def process_frame(request: FrameRequest):
         resultado = procesar_fotograma(image_np)
 
         if resultado["error"]:
+            if "quality_metrics" in resultado:
+                return {
+                    "status": "quality_error",
+                    "message": resultado["error"],
+                    "metrics": resultado["quality_metrics"]
+                }
             raise ValueError(resultado["error"])
 
         # Retornar únicamente el JSON estadístico

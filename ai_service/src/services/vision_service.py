@@ -25,6 +25,31 @@ def calcular_distancia(p1, p2):
     """Calcula la distancia Euclidiana 2D entre dos puntos normalizados (x, y)."""
     return math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2)
 
+def validar_calidad_imagen(image_np: np.ndarray) -> dict:
+    """
+    Evalúa la nitidez (desenfoque) y la iluminación de la imagen.
+    Umbrales basados en mejores prácticas para MediaPipe.
+    """
+    gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
+    
+    # 1. Nitidez (Varianza del Laplaciano)
+    laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+    is_sharp = laplacian_var > 100.0  # Umbral de borrosidad
+
+    # 2. Iluminación (Brillo promedio)
+    brightness = gray.mean()
+    is_well_lit = 40.0 < brightness < 230.0  # Evitar muy oscuro o muy sobreexpuesto
+
+    return {
+        "is_valid": is_sharp and is_well_lit,
+        "is_sharp": is_sharp,
+        "is_well_lit": is_well_lit,
+        "laplacian_var": round(laplacian_var, 2),
+        "brightness": round(brightness, 2),
+        "reason": "La imagen está muy borrosa." if not is_sharp else ("La iluminación no es adecuada (muy oscura o muy brillante)." if not is_well_lit else None)
+    }
+
+
 def procesar_fotograma(image_np: np.ndarray) -> dict:
     """
     Recibe una imagen decodificada como array de NumPy (BGR).
@@ -37,6 +62,13 @@ def procesar_fotograma(image_np: np.ndarray) -> dict:
     }
 
     try:
+        # Validación de Calidad
+        calidad = validar_calidad_imagen(image_np)
+        if not calidad["is_valid"]:
+            resultados["error"] = calidad["reason"]
+            resultados["quality_metrics"] = calidad
+            return resultados
+
         # Convertir a RGB (requerido por MediaPipe)
         image_rgb = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
 
