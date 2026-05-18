@@ -1,0 +1,61 @@
+# Pruebas y Funcionamiento del Frontend (React Native + TypeScript)
+
+¡El proyecto ha sido inicializado exitosamente! He convertido tu código a un entorno moderno de **Expo con TypeScript** y **NativeWind** (TailwindCSS para React Native).
+
+A continuación te explico detalladamente cómo probar la aplicación en tu celular físico y cómo funciona el código por dentro.
+
+---
+
+## 📱 1. Instrucciones para probar en tu celular (Testing)
+
+Dado que React Native compila para dispositivos móviles, la forma más rápida y efectiva de probar el prototipo durante el desarrollo es usando la aplicación **Expo Go**.
+
+### Paso 1: Instala Expo Go en tu celular
+Ve a la **App Store** (si tienes iPhone) o a **Google Play Store** (si tienes Android) y descarga la aplicación gratuita llamada **"Expo Go"**.
+
+### Paso 2: Levanta el servidor de desarrollo
+En tu consola de tu computadora (asegurándote de estar dentro de la carpeta `frontend`), ejecuta el siguiente comando:
+
+```powershell
+npx expo start
+```
+
+> [!TIP]
+> Si te pide instalar un paquete local (como `@expo/ngrok`), presiona `Y` para aceptar.
+
+### Paso 3: Escanea el Código QR
+1. El comando anterior mostrará un **código QR gigante** en tu consola.
+2. **Si tienes iPhone:** Abre la aplicación de cámara normal de tu iPhone, apunta al QR y toca la notificación que dice "Open in Expo Go".
+3. **Si tienes Android:** Abre la aplicación **Expo Go** que descargaste, y usa el botón "Scan QR Code" directamente desde la app.
+
+¡Listo! La aplicación se empaquetará a través de tu red WiFi local y aparecerá en la pantalla de tu celular. Podrás navegar por las pantallas, ver la cámara simulada y usar los botones. Si modificas algo en el código y guardas el archivo, ¡la app en tu celular se actualizará en menos de 1 segundo!
+
+---
+
+## 🧠 2. Explicación de la Arquitectura (Cómo funciona)
+
+Ya que es tu primera vez trabajando con React Native, aquí tienes una radiografía mental de cómo se comunican las piezas que programaste:
+
+### A. El Enrutador: `AppNavigator.tsx`
+A diferencia de la web donde navegas por "URLs" (ej: `/camara`), en móviles navegas por un sistema de cartas o "Stacks".
+- **Librería usada:** `@react-navigation/native-stack`
+- **¿Qué hace?:** Define un contenedor que mantiene en memoria todas las pantallas. Comienza siempre en `GuideScreen` porque tiene la propiedad `initialRouteName="Guide"`.
+- Cuando cambias de pantalla, el Navigator pone la nueva pantalla "encima" de la anterior.
+
+### B. El Onboarding: `GuideScreen.tsx` y `VerificationScreen.tsx`
+Estas son pantallas de contenido estático (texto y botones).
+- **Componentes base:** 
+  - `<View>`: Es el equivalente al `<div>` en HTML.
+  - `<Text>`: Es el equivalente a `<p>` o `<span>`. En React Native, **todo texto debe ir obligatoriamente dentro de una etiqueta `<Text>`**.
+  - `<ScrollView>`: Permite que el contenido se pueda deslizar hacia abajo si no entra en la pantalla.
+  - `<TouchableOpacity>`: Es un botón. Al presionarlo (`onPress`), ejecuta `navigation.navigate('Verification')`, lo cual le dice al `AppNavigator` que empuje la pantalla de Verificación a la vista.
+
+### C. La Lógica Compleja: `AssistedCamera.tsx`
+Esta es tu pantalla más inteligente y representa el "control de calidad" antes de enviar fotos a la IA.
+- **Estado (State):** Usa el hook `useState` para guardar si la luz (`isWellLit`) y la estabilidad (`isStable`) son correctas.
+- **El Ciclo de Vida (useEffect):** Tienes un `setInterval` que simula la lectura de sensores cada 1.5 segundos. En una app real de producción, aquí conectarías los sensores nativos (como `expo-sensors` para el giroscopio y librerías de cámara para el histograma de luz).
+- **La barrera (`handleCapture`):** El botón de foto valida el estado. Si ambos sensores están `true`, navega hacia el feed simulando éxito mediante `navigation.replace('Feed')`. Usar `replace` es muy inteligente aquí: destruye la pantalla de la cámara para que el usuario no pueda "volver atrás" accidentalmente tomando otra foto indeseada.
+
+### D. El Estilo: NativeWind (`className`)
+- Notarás que usas etiquetas como `className="flex-1 bg-slate-900"`. React Native puro **no** entiende esto (usa objetos JavaScript llamados `StyleSheet`). 
+- Sin embargo, gracias a la configuración profunda que acabo de instalarte de **Babel** y **NativeWind**, el compilador lee tus clases de Tailwind y las traduce automáticamente al formato de React Native en tiempo real. Esto permite una programación del UI rapidísima y moderna.
