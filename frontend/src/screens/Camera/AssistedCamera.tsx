@@ -1,12 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { AI_API_URL, NODE_API_URL } from '../../../config/config';
 import * as ImagePicker from 'expo-image-picker';
-
-// ⚠️ IMPORTANTE: Si pruebas en un dispositivo físico, cambia "localhost" por la IP local de tu computadora (ej: 192.168.1.55)
-// Si usas el emulador de Android localmente, "10.0.2.2" suele funcionar.
-const AI_API_URL = 'http://192.168.1.X:8000/api/vision/process-frame'; 
-const NODE_API_URL = 'http://192.168.1.X:3000/api/morphology/calculate';
 
 export default function AssistedCamera({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -22,7 +18,7 @@ export default function AssistedCamera({ navigation }) {
     setIsProcessing(true);
     try {
       // 1. Enviar foto al backend de Python (IA)
-      const aiResponse = await fetch(AI_API_URL, {
+      const aiResponse = await fetch(`${AI_API_URL}/api/vision/process-frame`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_base64: base64Str })
@@ -47,7 +43,7 @@ export default function AssistedCamera({ navigation }) {
       const { S, W, H } = aiData.data.morfologia_corporal;
       
       // 2. Enviar medidas al backend en Node.js
-      const nodeResponse = await fetch(NODE_API_URL, {
+      const nodeResponse = await fetch(`${NODE_API_URL}/api/morphology/calculate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ S, W, H }) // Modo invitado (sin usuarioId)
