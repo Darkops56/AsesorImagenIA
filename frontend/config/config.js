@@ -1,2 +1,3 @@
-export const AI_API_URL = 'http://10.18.91.166:8000'; 
-export const NODE_API_URL = 'http://10.18.91.166:3000';
+const host = '172.25.245.247';
+export const AI_API_URL = `http://${host}:8000`; 
+export const NODE_API_URL = `http://${host}:3000`;

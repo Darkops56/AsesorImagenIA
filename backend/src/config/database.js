@@ -4,7 +4,7 @@ dotenv.config();
 
 const connectDB = async () => {
   try {
-    const mongoURI = /*process.env.MONGO_URI ||*/ 'mongodb://localhost:27017/';
+    const mongoURI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/asesor_imagen_ia';
     
     await mongoose.connect(mongoURI);
     

@@ -38,7 +38,7 @@ export default function ResultScreen({ route, navigation }) {
       
       <TouchableOpacity 
         className="mt-8 bg-indigo-600 px-8 py-4 rounded-full w-full shadow-lg shadow-indigo-600/50"
-        onPress={() => navigation.navigate('Feed')}
+        onPress={() => navigation.navigate('Feed', { silueta })}
       >
         <Text className="text-white text-center font-bold text-lg">Ir al Feed</Text>
       </TouchableOpacity>

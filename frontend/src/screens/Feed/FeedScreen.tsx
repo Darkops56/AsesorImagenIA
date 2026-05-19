@@ -19,7 +19,8 @@ interface Prenda {
   };
 }
 
-export default function FeedScreen({ navigation }: any) {
+export default function FeedScreen({ route, navigation }: any) {
+  const { silueta } = route?.params || {};
   const [prendas, setPrendas] = useState<Prenda[]>([]);
   const [loading, setLoading] = useState(true);
   const [swipedAll, setSwipedAll] = useState(false);
@@ -30,7 +31,10 @@ export default function FeedScreen({ navigation }: any) {
 
   const fetchPrendas = async () => {
     try {
-      const response = await fetch(`${NODE_API_URL}/api/prendas`);
+      const url = silueta 
+        ? `${NODE_API_URL}/api/prendas?silueta=${encodeURIComponent(silueta)}` 
+        : `${NODE_API_URL}/api/prendas`;
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Error en la red al recuperar prendas');
       }
