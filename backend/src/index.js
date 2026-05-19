@@ -4,6 +4,7 @@ const cors = require('cors');
 const connectDB = require('./config/database');
 
 const morphologyRoutes = require('./routes/morphologyRoutes');
+const prendasRoutes = require('./routes/prendasRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,6 +18,7 @@ connectDB();
 
 // Rutas base
 app.use('/api/morphology', morphologyRoutes);
+app.use('/api/prendas', prendasRoutes);
 
 // Endpoint de prueba Health Check
 app.get('/health', (req, res) => {
