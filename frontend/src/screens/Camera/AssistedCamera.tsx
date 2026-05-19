@@ -9,6 +9,7 @@ export default function AssistedCamera({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState('back');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [countdown, setCountdown] = useState(null);
   const cameraRef = useRef(null);
 
   const toggleCameraFacing = () => {
@@ -39,6 +40,16 @@ export default function AssistedCamera({ navigation }) {
         Alert.alert(
           'Foto rechazada por la IA 🤖', 
           `${aiData.message}\n\nPor favor, intenta tomar otra foto en un lugar mejor iluminado y mantén la cámara firme.`
+        );
+        setIsProcessing(false);
+        return;
+      }
+
+      // Validación de Encuadre y Restricciones
+      if (typeof aiData.error === 'string') {
+        Alert.alert(
+          'Error de Encuadre 📏', 
+          aiData.error
         );
         setIsProcessing(false);
         return;
@@ -84,21 +95,31 @@ export default function AssistedCamera({ navigation }) {
   };
 
   const handleCapture = async () => {
-    if (cameraRef.current) {
+    if (cameraRef.current && !isProcessing && countdown === null) {
+      // Temporizador Físico (Anti-Motion Blur)
+      for (let i = 3; i > 0; i--) {
+        setCountdown(i);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      setCountdown(null);
+
       try {
         const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.7 });
         if (photo.base64 && photo.uri) {
           setIsProcessing(true);
           
+          let base64ToProcess = photo.base64;
+
           try {
-            // Resize image to small resolution for faster JS processing
+            // Resize image to fixed height for payload reduction
             const manipResult = await ImageManipulator.manipulateAsync(
               photo.uri,
-              [{ resize: { width: 200 } }],
-              { base64: true, format: ImageManipulator.SaveFormat.JPEG }
+              [{ resize: { height: 800 } }],
+              { base64: true, compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
             );
 
             if (manipResult.base64) {
+              base64ToProcess = manipResult.base64;
               const quality = await validateImageQuality(manipResult.base64);
               console.log("Image Quality:", quality);
 
@@ -121,13 +142,13 @@ export default function AssistedCamera({ navigation }) {
               }
             }
           } catch (validationError) {
-            console.error("Error during local validation:", validationError);
+            console.error("Error during local validation/manipulation:", validationError);
             // Si la validación local falla por alguna razón (ej. buffer error), 
             // continuamos con el procesamiento normal para no bloquear.
           }
 
           // If validation passes (or fails to run but doesn't throw specific quality errors), process it
-          await processImage(photo.base64);
+          await processImage(base64ToProcess);
         }
       } catch (e) {
         setIsProcessing(false);
@@ -178,6 +199,13 @@ export default function AssistedCamera({ navigation }) {
           <View className="absolute z-50 w-full h-full bg-black/80 justify-center items-center">
             <ActivityIndicator size="large" color="#6366f1" />
             <Text className="text-white font-bold mt-4 text-lg">Validando calidad con IA...</Text>
+          </View>
+        )}
+
+        {/* Capa de Cuenta Regresiva */}
+        {countdown !== null && (
+          <View className="absolute z-50 w-full h-full bg-black/50 justify-center items-center">
+            <Text className="text-white font-bold text-[120px]">{countdown}</Text>
           </View>
         )}
 

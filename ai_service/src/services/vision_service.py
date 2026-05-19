@@ -68,6 +68,41 @@ def validar_calidad_imagen(image_np: np.ndarray) -> dict:
         "reason": "La imagen está muy borrosa." if not is_sharp else ("La iluminación no es adecuada (muy oscura o muy brillante)." if not is_well_lit else None)
     }
 
+def validar_encuadre(pose_landmarks) -> dict:
+    """
+    Evalúa si las partes críticas del cuerpo están dentro de la foto
+    utilizando el score de visibilidad de MediaPipe.
+    """
+    umbral_visibilidad = 0.65 # Requiere un 65% de certeza de que el punto se ve
+    
+    # Extraemos los puntos clave (landmarks)
+    nariz = pose_landmarks.landmark[0]
+    hombro_izq, hombro_der = pose_landmarks.landmark[11], pose_landmarks.landmark[12]
+    cadera_izq, cadera_der = pose_landmarks.landmark[23], pose_landmarks.landmark[24]
+
+    # Filtro de Frontalidad Estricto (Eje Z)
+    if abs(hombro_izq.z - hombro_der.z) > 0.15 or abs(cadera_izq.z - cadera_der.z) > 0.15:
+        return {"is_valid": False, "reason": "Estás un poco de lado. Por favor, párate mirando completamente de frente a la cámara."}
+
+    # Filtro de Proximidad Mínima
+    promedio_y_hombros = (hombro_izq.y + hombro_der.y) / 2.0
+    promedio_y_caderas = (cadera_izq.y + cadera_der.y) / 2.0
+    altura_torso = promedio_y_caderas - promedio_y_hombros
+    if altura_torso < 0.25:
+        return {"is_valid": False, "reason": "Estás muy lejos. Acércate a la cámara para una medición precisa."}
+
+    # Validaciones lógicas
+    rostro_visible = nariz.visibility > umbral_visibilidad
+    hombros_visibles = (hombro_izq.visibility > umbral_visibilidad) and (hombro_der.visibility > umbral_visibilidad)
+    caderas_visibles = (cadera_izq.visibility > umbral_visibilidad) and (cadera_der.visibility > umbral_visibilidad)
+
+    if not rostro_visible:
+        return {"is_valid": False, "reason": "No logro ver tu rostro. Apunta la cámara un poco más arriba."}
+    
+    if not hombros_visibles or not caderas_visibles:
+        return {"is_valid": False, "reason": "Necesito ver tu torso completo (desde hombros hasta caderas). Aléjate un paso hacia atrás."}
+
+    return {"is_valid": True, "reason": "Encuadre perfecto."}
 
 def procesar_fotograma(image_np: np.ndarray) -> dict:
     """
@@ -94,6 +129,12 @@ def procesar_fotograma(image_np: np.ndarray) -> dict:
         # 1. Procesamiento Corporal (Pose)
         pose_results = pose.process(image_rgb)
         if pose_results.pose_landmarks and pose_results.segmentation_mask is not None:
+            # Validar encuadre
+            encuadre_valido = validar_encuadre(pose_results.pose_landmarks)
+            if not encuadre_valido["is_valid"]:
+                resultados["error"] = encuadre_valido["reason"]
+                return resultados
+
             landmarks = pose_results.pose_landmarks.landmark
             mask = pose_results.segmentation_mask
             
@@ -101,12 +142,16 @@ def procesar_fotograma(image_np: np.ndarray) -> dict:
             shoulder_y = (landmarks[11].y + landmarks[12].y) / 2.0
             hip_y = (landmarks[23].y + landmarks[24].y) / 2.0
             
-            # Estimar la altura Y de la cintura (punto medio entre hombros y caderas)
-            waist_y = (shoulder_y + hip_y) / 2.0
+            # Cintura Dinámica Autoadaptativa (Muestreo en Rango)
+            rango_inicio = shoulder_y + 0.3 * (hip_y - shoulder_y)
+            rango_fin = shoulder_y + 0.7 * (hip_y - shoulder_y)
+            alturas_cintura = np.linspace(rango_inicio, rango_fin, 5)
+            
+            anchos_cintura = [calcular_ancho_segmentacion(mask, y) for y in alturas_cintura]
+            w_dist = min(anchos_cintura)
             
             # Calcular anchos reales usando la máscara de segmentación
             s_dist = calcular_ancho_segmentacion(mask, shoulder_y)
-            w_dist = calcular_ancho_segmentacion(mask, waist_y)
             h_dist = calcular_ancho_segmentacion(mask, hip_y)
             
             resultados["morfologia_corporal"] = {

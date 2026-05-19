@@ -43,7 +43,9 @@ def process_frame(request: FrameRequest):
                     "message": resultado["error"],
                     "metrics": resultado["quality_metrics"]
                 }
-            raise ValueError(resultado["error"])
+            return {
+                "error": resultado["error"]
+            }
 
         # Retornar únicamente el JSON estadístico
         return {
