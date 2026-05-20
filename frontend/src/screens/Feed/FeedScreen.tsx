@@ -7,6 +7,7 @@ import { AuthContext } from '../../context/AuthContext';
 
 
 interface Prenda {
+  _id?: string;
   id_prenda: string;
   nombre: string;
   categoria: string;
@@ -57,7 +58,17 @@ export default function FeedScreen({ route, navigation }: any) {
       if (!response.ok) {
         throw new Error('Error en la red al recuperar prendas');
       }
-      const data = await response.json();
+      let data = await response.json();
+      
+      // Si venimos del Explorador, ponemos la prenda seleccionada de primero
+      if (seedPrendaId) {
+        const seedIndex = data.findIndex((item: Prenda) => item._id === seedPrendaId);
+        if (seedIndex > -1) {
+          const [seedItem] = data.splice(seedIndex, 1);
+          data.unshift(seedItem);
+        }
+      }
+      
       setPrendas(data);
       setSwipedAll(false);
     } catch (error) {
