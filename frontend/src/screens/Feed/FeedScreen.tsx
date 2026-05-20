@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Swiper from 'react-native-deck-swiper';
 import { NODE_API_URL } from '../../../config/config';
+import { AuthContext } from '../../context/AuthContext';
+
 
 interface Prenda {
   id_prenda: string;
@@ -20,26 +23,43 @@ interface Prenda {
 }
 
 export default function FeedScreen({ route, navigation }: any) {
-  const { silueta } = route?.params || {};
+  const { user } = useContext(AuthContext);
+  const { silueta, seedPrendaId, seedCategoria } = route?.params || {};
   const [prendas, setPrendas] = useState<Prenda[]>([]);
   const [loading, setLoading] = useState(true);
   const [swipedAll, setSwipedAll] = useState(false);
 
-  useEffect(() => {
-    fetchPrendas();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        setLoading(true);
+        fetchPrendas();
+      }
+      
+      if (seedPrendaId || seedCategoria) {
+        console.log(`[PIVOT FEED] Recibido seedPrendaId: ${seedPrendaId}, seedCategoria: ${seedCategoria}`);
+        // Futura lógica para buscar prendas similares basadas en esta semilla
+      }
+    }, [user, seedPrendaId, seedCategoria])
+  );
 
   const fetchPrendas = async () => {
     try {
-      const url = silueta 
+      let url = silueta 
         ? `${NODE_API_URL}/api/prendas?silueta=${encodeURIComponent(silueta)}` 
         : `${NODE_API_URL}/api/prendas`;
+        
+      if (user?._id) {
+        url += url.includes('?') ? `&usuario_id=${user._id}` : `?usuario_id=${user._id}`;
+      }
+      
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Error en la red al recuperar prendas');
       }
       const data = await response.json();
       setPrendas(data);
+      setSwipedAll(false);
     } catch (error) {
       console.error('Error fetching prendas:', error);
     } finally {
@@ -47,10 +67,31 @@ export default function FeedScreen({ route, navigation }: any) {
     }
   };
 
+  const registrarInteraccion = async (prenda: Prenda, tipo: 'LIKE' | 'DISLIKE') => {
+    if (!user?._id) return;
+    try {
+      await fetch(`${NODE_API_URL}/api/interacciones`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          usuario_id: user._id,
+          prenda_id: (prenda as any)._id, // Usamos el _id de MongoDB en vez del id_prenda (ej. PRN-001)
+          tipo_interaccion: tipo,
+          tiempo_visualizacion_ms: 2000 // Valor por defecto o real si medimos el tiempo
+        })
+      });
+    } catch (error) {
+      console.error('Error al registrar interacción:', error);
+    }
+  };
+
   const handleLike = (cardIndex: number) => {
     const prenda = prendas[cardIndex];
     if (prenda) {
       console.log(`[LIKE] Te gustó: ${prenda.nombre}`);
+      registrarInteraccion(prenda, 'LIKE');
     }
   };
 
@@ -58,6 +99,7 @@ export default function FeedScreen({ route, navigation }: any) {
     const prenda = prendas[cardIndex];
     if (prenda) {
       console.log(`[PASS] Descartaste: ${prenda.nombre}`);
+      registrarInteraccion(prenda, 'DISLIKE');
     }
   };
 
@@ -100,30 +142,7 @@ export default function FeedScreen({ route, navigation }: any) {
   };
 
   return (
-    <View className="flex-1 bg-slate-900">
-      <TouchableOpacity 
-        className="absolute top-12 left-6 p-3 bg-slate-800/80 rounded-full flex-row items-center z-50"
-        onPress={() => navigation.goBack()}
-      >
-        <Text className="text-white text-xl font-bold">←</Text>
-      </TouchableOpacity>
-
-      {/* Controles de Navegación Superior Derecha */}
-      <View className="absolute top-12 right-6 z-50 flex-row space-x-3">
-        <TouchableOpacity 
-          className="px-4 py-3 bg-slate-800/80 rounded-full flex-row items-center border border-indigo-500/30 shadow-lg"
-          onPress={() => navigation.navigate('Perfil')}
-        >
-          <Text className="text-indigo-300 font-bold">👤 Perfil</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          className="px-4 py-3 bg-slate-800/80 rounded-full flex-row items-center border border-indigo-500/30 shadow-lg"
-          onPress={() => navigation.navigate('Armario')}
-        >
-          <Text className="text-indigo-300 font-bold">👗 Armario</Text>
-        </TouchableOpacity>
-      </View>
+    <View className="flex-1 bg-slate-900 pt-12">
 
       {loading ? (
         <View className="flex-1 justify-center items-center">

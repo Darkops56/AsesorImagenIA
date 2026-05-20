@@ -1,11 +1,15 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, Modal, SafeAreaView, Dimensions } from 'react-native';
+import React, { useState, useCallback, useEffect, useContext } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Image, Modal, SafeAreaView, Dimensions, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { AuthContext } from '../../context/AuthContext';
+import { NODE_API_URL } from '../../../config/config';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // padding horizontal 16*2 + gap 16 = 48
 
 interface Prenda {
-  id: string;
+  id: string; // ID de la interacción
+  prenda_id: string; // ID real de la prenda
   nombre: string;
   categoria: string;
   imagen: string;
@@ -16,36 +20,75 @@ interface Prenda {
   };
 }
 
-// Datos provisionales
-const mockFavoritas: Prenda[] = [
-  { id: '1', nombre: 'Chaqueta de Cuero Vintage', categoria: 'Abrigos', imagen: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=500', detalles: { corte: 'Slim Fit', cuello: 'Mao', color: 'Negro' } },
-  { id: '2', nombre: 'Vestido de Seda Floral', categoria: 'Vestidos', imagen: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=500', detalles: { corte: 'A-Line', cuello: 'V', color: 'Azul Marino' } },
-  { id: '3', nombre: 'Abrigo de Lana Minimalista', categoria: 'Abrigos', imagen: 'https://images.unsplash.com/photo-1539533113208-f6df8cc8b543?w=500', detalles: { corte: 'Oversize', cuello: 'Solapa', color: 'Camel' } },
-  { id: '4', nombre: 'Blusa Blanca Elegante', categoria: 'Camisas', imagen: 'https://images.unsplash.com/photo-1550639525-c97d455acf70?w=500', detalles: { corte: 'Regular', cuello: 'Clásico', color: 'Blanco' } },
-];
-
-const mockDescartadas: Prenda[] = [
-  { id: '5', nombre: 'Camiseta Gráfica Neón', categoria: 'Camisetas', imagen: 'https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?w=500', detalles: { corte: 'Regular', cuello: 'Redondo', color: 'Amarillo' } },
-  { id: '6', nombre: 'Pantalones Cargo Camuflaje', categoria: 'Pantalones', imagen: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=500', detalles: { corte: 'Relaxed', cuello: 'N/A', color: 'Verde' } },
-];
-
 const FALLBACK_IMAGE = 'https://via.placeholder.com/300x400/333333/FFFFFF?text=Sin+Imagen';
 
 export default function ArmarioScreen() {
+  const { user } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState<'favoritas' | 'descartadas'>('favoritas');
-  const [favoritas, setFavoritas] = useState<Prenda[]>(mockFavoritas);
-  const [descartadas, setDescartadas] = useState<Prenda[]>(mockDescartadas);
+  const [favoritas, setFavoritas] = useState<Prenda[]>([]);
+  const [descartadas, setDescartadas] = useState<Prenda[]>([]);
   const [selectedPrenda, setSelectedPrenda] = useState<Prenda | null>(null);
+  const [loading, setLoading] = useState(true);
   
   const currentData = activeTab === 'favoritas' ? favoritas : descartadas;
 
-  const handleRemove = (id: string) => {
-    if (activeTab === 'favoritas') {
-      setFavoritas(prev => prev.filter(p => p.id !== id));
-    } else {
-      setDescartadas(prev => prev.filter(p => p.id !== id));
+  useFocusEffect(
+    useCallback(() => {
+      if (user?._id) {
+        fetchInteracciones();
+      }
+    }, [user])
+  );
+
+  const fetchInteracciones = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${NODE_API_URL}/api/interacciones/${user?._id}`);
+      if (!response.ok) throw new Error('Error al obtener interacciones');
+      const data = await response.json();
+      
+      const likes = data.filter((int: any) => int.tipo_interaccion === 'LIKE').map((int: any) => ({
+        id: int._id,
+        prenda_id: int.prenda.id,
+        nombre: int.prenda.nombre,
+        categoria: int.prenda.categoria,
+        imagen: int.prenda.imagen,
+        detalles: int.prenda.detalles
+      }));
+      
+      const dislikes = data.filter((int: any) => int.tipo_interaccion === 'DISLIKE').map((int: any) => ({
+        id: int._id,
+        prenda_id: int.prenda.id,
+        nombre: int.prenda.nombre,
+        categoria: int.prenda.categoria,
+        imagen: int.prenda.imagen,
+        detalles: int.prenda.detalles
+      }));
+
+      setFavoritas(likes);
+      setDescartadas(dislikes);
+    } catch (error) {
+      console.error('Error fetching interacciones:', error);
+    } finally {
+      setLoading(false);
     }
-    setSelectedPrenda(null);
+  };
+
+  const handleRemove = async (id: string) => {
+    try {
+      // Eliminar de la base de datos para que vuelva al Feed
+      await fetch(`${NODE_API_URL}/api/interacciones/${id}`, { method: 'DELETE' });
+      
+      // Actualizar estado local
+      if (activeTab === 'favoritas') {
+        setFavoritas(prev => prev.filter(p => p.id !== id));
+      } else {
+        setDescartadas(prev => prev.filter(p => p.id !== id));
+      }
+      setSelectedPrenda(null);
+    } catch (error) {
+      console.error('Error al eliminar interacción:', error);
+    }
   };
 
   const renderPrendaCard = useCallback(({ item }: { item: Prenda }) => {
@@ -59,9 +102,9 @@ export default function ArmarioScreen() {
   }, [activeTab, favoritas, descartadas]);
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-900">
+    <SafeAreaView className="flex-1 bg-neutral-900 pt-8">
       {/* Header Tabs */}
-      <View className="flex-row justify-center mt-4 px-4 border-b border-neutral-800">
+      <View className="flex-row justify-center mt-6 px-4 border-b border-neutral-800">
         <TouchableOpacity 
           className={`flex-1 py-4 items-center border-b-2 ${activeTab === 'favoritas' ? 'border-indigo-500' : 'border-transparent'}`}
           onPress={() => setActiveTab('favoritas')}
@@ -82,20 +125,26 @@ export default function ArmarioScreen() {
       </View>
 
       {/* Grid */}
-      <FlatList
-        data={currentData}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={{ padding: 16 }}
-        columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 16 }}
-        renderItem={renderPrendaCard}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View className="flex-1 items-center justify-center mt-20">
-            <Text className="text-neutral-500 text-lg">No hay prendas en esta sección.</Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#6366f1" />
+        </View>
+      ) : (
+        <FlatList
+          data={currentData}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          contentContainerStyle={{ padding: 16 }}
+          columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 16 }}
+          renderItem={renderPrendaCard}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View className="flex-1 items-center justify-center mt-20">
+              <Text className="text-neutral-500 text-lg">No hay prendas en esta sección.</Text>
+            </View>
+          }
+        />
+      )}
 
       {/* Modal / Bottom View para Detalles */}
       <Modal

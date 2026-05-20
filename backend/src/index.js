@@ -6,6 +6,7 @@ const connectDB = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
 const morphologyRoutes = require('./routes/morphologyRoutes');
 const prendasRoutes = require('./routes/prendasRoutes');
+const interaccionesRoutes = require('./routes/interaccionesRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +22,7 @@ connectDB();
 app.use('/api/auth', authRoutes);
 app.use('/api/morphology', morphologyRoutes);
 app.use('/api/prendas', prendasRoutes);
+app.use('/api/interacciones', interaccionesRoutes);
 
 // Endpoint de prueba Health Check
 app.get('/health', (req, res) => {

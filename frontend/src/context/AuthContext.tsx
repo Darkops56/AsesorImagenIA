@@ -43,8 +43,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedToken = await AsyncStorage.getItem('@token');
 
       if (storedUser && storedToken) {
+        // Fallback rápido
         setUser(JSON.parse(storedUser));
         setIsAuthenticated(true);
+
+        // Fetch latest data from backend to ensure silueta_detectada is present
+        try {
+          const response = await fetch(`${NODE_API_URL}/api/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${storedToken}`
+            }
+          });
+          if (response.ok) {
+            const latestUser = await response.json();
+            setUser(latestUser);
+            await AsyncStorage.setItem('@user', JSON.stringify(latestUser));
+          }
+        } catch (fetchError) {
+          console.log('No se pudo verificar el usuario con el backend, usando caché local');
+        }
       }
     } catch (error) {
       console.error('Error loading auth data', error);

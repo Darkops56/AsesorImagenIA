@@ -11,6 +11,7 @@ const prendaSchema = new mongoose.Schema({
     tiro: { type: String } // Para pantalones
   },
   tags_compatibilidad: [{ type: String }], // ej: ['Reloj de Arena', 'Triángulo Invertido']
+  siluetas_compatibles: [{ type: String }], // Nuevo campo para match IA
   metadata: {
     color_dominante: { type: String },
     url_imagen: { type: String }

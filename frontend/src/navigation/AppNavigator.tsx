@@ -1,5 +1,7 @@
 import React, { useContext } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { ActivityIndicator, View } from 'react-native';
 
@@ -15,8 +17,43 @@ import FeedScreen from '../screens/Feed/FeedScreen';
 import ResultScreen from '../screens/Result/ResultScreen';
 import ArmarioScreen from '../screens/Armario/ArmarioScreen';
 import PerfilScreen from '../screens/Profile/PerfilScreen';
+import ExplorarScreen from '../screens/Explorar/ExplorarScreen';
 
 const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
+
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarStyle: { backgroundColor: '#0f172a', borderTopColor: '#334155' },
+        tabBarActiveTintColor: '#818cf8',
+        tabBarInactiveTintColor: '#64748b',
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: any;
+
+          if (route.name === 'Feed') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Explorar') {
+            iconName = focused ? 'search' : 'search-outline';
+          } else if (route.name === 'Armario') {
+            iconName = focused ? 'shirt' : 'shirt-outline';
+          } else if (route.name === 'Perfil') {
+            iconName = focused ? 'person' : 'person-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen name="Feed" component={FeedScreen} />
+      <Tab.Screen name="Explorar" component={ExplorarScreen} />
+      <Tab.Screen name="Armario" component={ArmarioScreen} />
+      <Tab.Screen name="Perfil" component={PerfilScreen} />
+    </Tab.Navigator>
+  );
+}
 
 export default function AppNavigator() {
   const { isAuthenticated, isLoading, user } = useContext(AuthContext);
@@ -35,7 +72,7 @@ export default function AppNavigator() {
         headerShown: false,
         contentStyle: { backgroundColor: '#0f172a' }
       }}
-      initialRouteName={isAuthenticated ? (user?.silueta_detectada ? "Feed" : "Guide") : "Login"}
+      initialRouteName={isAuthenticated ? (user?.silueta_detectada ? "MainTabs" : "Guide") : "Login"}
     >
       {!isAuthenticated ? (
         // FLUJO DE AUTENTICACIÓN
@@ -46,13 +83,16 @@ export default function AppNavigator() {
       ) : (
         // FLUJO DE APLICACIÓN
         <>
+          {user?.silueta_detectada ? (
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+          ) : null}
           <Stack.Screen name="Guide" component={GuideScreen} />
           <Stack.Screen name="Verification" component={VerificationScreen} />
           <Stack.Screen name="Camera" component={AssistedCamera} />
           <Stack.Screen name="Result" component={ResultScreen} />
-          <Stack.Screen name="Feed" component={FeedScreen} />
-          <Stack.Screen name="Armario" component={ArmarioScreen} />
-          <Stack.Screen name="Perfil" component={PerfilScreen} />
+          {!user?.silueta_detectada ? (
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+          ) : null}
         </>
       )}
     </Stack.Navigator>
