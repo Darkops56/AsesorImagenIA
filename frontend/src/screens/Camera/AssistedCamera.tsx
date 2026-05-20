@@ -5,7 +5,10 @@ import { AI_API_URL, NODE_API_URL } from '../../../config/config';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { validateImageQuality } from '../../utils/imageValidation';
+import { AuthContext } from '../../context/AuthContext';
+import { useContext } from 'react';
 export default function AssistedCamera({ navigation }) {
+  const { user, updateUserContext } = useContext(AuthContext);
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState('back');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -18,12 +21,16 @@ export default function AssistedCamera({ navigation }) {
 
   const processImage = async (base64Str) => {
     setIsProcessing(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
+    
     try {
       // 1. Enviar foto al backend de Python (IA)
       const aiResponse = await fetch(`${AI_API_URL}/api/vision/process-frame`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_base64: base64Str })
+        body: JSON.stringify({ image_base64: base64Str }),
+        signal: controller.signal
       });
       
       const aiResponseText = await aiResponse.text();
@@ -41,7 +48,6 @@ export default function AssistedCamera({ navigation }) {
           'Foto rechazada por la IA 🤖', 
           `${aiData.message}\n\nPor favor, intenta tomar otra foto en un lugar mejor iluminado y mantén la cámara firme.`
         );
-        setIsProcessing(false);
         return;
       }
 
@@ -51,7 +57,6 @@ export default function AssistedCamera({ navigation }) {
           'Error de Encuadre 📏', 
           aiData.error
         );
-        setIsProcessing(false);
         return;
       }
       
@@ -65,7 +70,8 @@ export default function AssistedCamera({ navigation }) {
       const nodeResponse = await fetch(`${NODE_API_URL}/api/morphology/calculate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ S, W, H }) // Modo invitado (sin usuarioId)
+        body: JSON.stringify({ usuarioId: user?._id || null, S, W, H }), // Enviar usuarioId si está autenticado
+        signal: controller.signal
       });
       
       const nodeResponseText = await nodeResponse.text();
@@ -80,16 +86,26 @@ export default function AssistedCamera({ navigation }) {
       if (!nodeResponse.ok) {
         throw new Error(nodeData.error || 'Error en el servidor de Node.js');
       }
+
+      // Si el backend devuelve un usuario actualizado, actualizar el contexto global
+      if (nodeData.usuario) {
+        updateUserContext(nodeData.usuario);
+      }
       
       Alert.alert('¡Análisis Exitoso! 🎉', `Tu silueta ha sido clasificada como: ${nodeData.silueta}`);
       
       // 3. Navegar a la pantalla de resultados
       navigation.navigate('Result', { silueta: nodeData.silueta, imageBase64: base64Str });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Alert.alert('Error de procesamiento', error.message || 'No se pudo conectar con los servidores.');
+      if (error.name === 'AbortError') {
+        Alert.alert('Tiempo agotado ⏳', 'El servidor tardó demasiado en responder. Por favor, intenta de nuevo.');
+      } else {
+        Alert.alert('Error de procesamiento', error.message || 'No se pudo conectar con los servidores.');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setIsProcessing(false);
     }
   };
