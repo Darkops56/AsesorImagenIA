@@ -108,6 +108,14 @@ export default function FeedScreen({ route, navigation }: any) {
         <Text className="text-white text-xl font-bold">←</Text>
       </TouchableOpacity>
 
+      {/* Botón para ir al Armario */}
+      <TouchableOpacity 
+        className="absolute top-12 right-6 px-4 py-3 bg-slate-800/80 rounded-full flex-row items-center z-50 border border-indigo-500/30 shadow-lg"
+        onPress={() => navigation.navigate('Armario')}
+      >
+        <Text className="text-indigo-300 font-bold">👗 Mi Armario</Text>
+      </TouchableOpacity>
+
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#818cf8" />

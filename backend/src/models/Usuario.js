@@ -2,8 +2,10 @@ const mongoose = require('mongoose');
 
 const usuarioSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
-  password_hash: { type: String }, // Puede ser null si usa SSO
-  nombre: { type: String },
+  password_hash: { type: String, required: true },
+  fullName: { type: String, required: true },
+  username: { type: String, required: true, unique: true },
+  phone: { type: String },
   medidas_morfometricas: {
     S: { type: Number, default: null }, // Shoulders
     W: { type: Number, default: null }, // Waist

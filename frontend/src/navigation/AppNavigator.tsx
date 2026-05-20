@@ -7,6 +7,7 @@ import VerificationScreen from '../screens/Onboarding/VerificationScreen';
 import AssistedCamera from '../screens/Camera/AssistedCamera';
 import FeedScreen from '../screens/Feed/FeedScreen';
 import ResultScreen from '../screens/Result/ResultScreen';
+import ArmarioScreen from '../screens/Armario/ArmarioScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +30,7 @@ export default function AppNavigator() {
       
       {/* FLUJO 3: DISCOVERY FEED */}
       <Stack.Screen name="Feed" component={FeedScreen} />
+      <Stack.Screen name="Armario" component={ArmarioScreen} />
     </Stack.Navigator>
   );
 }

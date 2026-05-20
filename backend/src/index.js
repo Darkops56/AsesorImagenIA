@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/database');
 
+const authRoutes = require('./routes/authRoutes');
 const morphologyRoutes = require('./routes/morphologyRoutes');
 const prendasRoutes = require('./routes/prendasRoutes');
 
@@ -17,6 +18,7 @@ app.use(express.json());
 connectDB();
 
 // Rutas base
+app.use('/api/auth', authRoutes);
 app.use('/api/morphology', morphologyRoutes);
 app.use('/api/prendas', prendasRoutes);
 
