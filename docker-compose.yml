@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: asesor_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: asesor_backend
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - MONGO_URI=mongodb://mongodb:27017/asesor_imagen_ia
+      # Agrega otras variables necesarias (como JWT_SECRET si se usa en el futuro de forma dinámica)
+      - JWT_SECRET=secretkey123
+    volumes:
+      # Monta la carpeta local para hot-reload
+      - ./backend:/app
+      # Ignora la carpeta node_modules local para usar la del contenedor
+      - /app/node_modules
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  ai_service:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
+    container_name: asesor_ai_service
+    ports:
+      - "8000:8000"
+    volumes:
+      # Monta la carpeta local para hot-reload
+      - ./ai_service:/app
+    restart: unless-stopped
+
+volumes:
+  mongo_data:

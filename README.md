@@ -26,3 +26,45 @@ Es la pasarela central y la capa de persistencia lógica. Recibe las medidas cor
 ## 🔒 Privacidad y "Cero Retención"
 Este software fue diseñado priorizando la confidencialidad. 
 **No se almacenan fotografías de los cuerpos o rostros de los usuarios bajo ninguna circunstancia.** Las imágenes se destruyen mediante forzado de recolección de basura (*Garbage Collection*) en milisegundos una vez la IA ha calculado la distancia matemática en píxeles. Únicamente persisten números anónimos en la Base de Datos.
+
+---
+
+## 🚀 Guía de Instalación Rápida (Docker)
+
+El proyecto está diseñado para ser clonado y levantado en cualquier máquina (Windows, Mac, Linux) sin dolor de cabeza de configuraciones. Para la infraestructura del servidor (Base de Datos + Node.js + Python), utilizamos Docker.
+
+### 1. Clonar el repositorio y levantar servidores
+Abre tu terminal en la carpeta donde deseas guardar el proyecto y ejecuta:
+```bash
+git clone https://github.com/Darkops56/AsesorImagenIA.git
+cd AsesorImagenIA
+
+# Construir y levantar contenedores en segundo plano
+docker-compose up --build -d
+```
+> **Nota:** La primera vez tomará algunos minutos mientras Docker descarga las imágenes de Python, Node.js y MongoDB.
+> **Comandos útiles:**
+> - Ver si están corriendo: `docker ps`
+> - Ver logs del backend: `docker logs asesor_backend`
+> - Bajar los servicios: `docker-compose down`
+
+### 2. Configurar y levantar el Frontend Móvil
+El frontend requiere correr localmente en tu computadora para comunicarse con tu celular o emulador mediante Expo.
+```bash
+cd frontend
+
+# Instalar dependencias
+npm install
+
+# Actualizar tu IP dinámica para que el celular encuentre los contenedores
+npm run update-ip
+
+# Levantar la aplicación de Expo
+npx expo start -c
+```
+Escanea el código QR que aparecerá en tu terminal con la app de "Expo Go" en tu celular.
+
+---
+### 🛠 Solución de Errores Comunes
+- **El celular no conecta al servidor:** Asegúrate de estar en la misma red Wi-Fi que la PC. Si cambiaste de red, debes volver a correr `npm run update-ip` dentro de la carpeta `frontend`.
+- **Puerto 27017 o 3000 o 8000 en uso:** Si Docker se queja de puertos en uso, significa que tienes un MongoDB, Node o Python corriendo localmente en esos puertos. Ciérralos e intenta levantar `docker-compose` de nuevo.
