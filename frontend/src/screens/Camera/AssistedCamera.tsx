@@ -1,12 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useEffect, useContext } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Vibration } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { AI_API_URL, NODE_API_URL } from '../../../config/config';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { validateImageQuality } from '../../utils/imageValidation';
 import { AuthContext } from '../../context/AuthContext';
-import { useContext } from 'react';
+import { Accelerometer } from 'expo-sensors';
 export default function AssistedCamera({ navigation }) {
   const { user, updateUserContext } = useContext(AuthContext);
   const [permission, requestPermission] = useCameraPermissions();
@@ -14,6 +14,43 @@ export default function AssistedCamera({ navigation }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [countdown, setCountdown] = useState(null);
   const cameraRef = useRef(null);
+
+  const [isStable, setIsStable] = useState(false);
+  const [isParallel, setIsParallel] = useState(false);
+  const prevAccelRef = useRef({ x: 0, y: 0, z: 0 });
+
+  useEffect(() => {
+    Accelerometer.setUpdateInterval(100);
+
+    const subscription = Accelerometer.addListener(accelerometerData => {
+      const { x, y, z } = accelerometerData;
+      const prev = prevAccelRef.current;
+
+      // Cálculo de estabilidad (diferencia euclidiana)
+      const delta = Math.sqrt(Math.pow(x - prev.x, 2) + Math.pow(y - prev.y, 2) + Math.pow(z - prev.z, 2));
+      const stable = delta < 0.08;
+      setIsStable(stable);
+
+      // Cálculo de inclinación paralela
+      const pitchDeg = Math.abs(Math.atan2(z, Math.sqrt(x * x + y * y))) * (180 / Math.PI);
+      const parallel = pitchDeg <= 12;
+      setIsParallel(parallel);
+
+      prevAccelRef.current = { x, y, z };
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const isReadyToCapture = isStable && isParallel;
+
+  useEffect(() => {
+    if (isReadyToCapture) {
+      Vibration.vibrate(80);
+    }
+  }, [isReadyToCapture]);
 
   const toggleCameraFacing = () => {
     setFacing(current => (current === 'back' ? 'front' : 'back'));
@@ -233,9 +270,11 @@ export default function AssistedCamera({ navigation }) {
           </View>
 
           {/* MENSAJE DE AYUDA CONTEXTUAL */}
-          <View className="absolute top-16 bg-black/60 px-6 py-2 rounded-full">
+          <View className={`absolute top-16 px-6 py-2 rounded-full ${isReadyToCapture ? 'bg-indigo-600/90' : 'bg-black/60'}`}>
             <Text className="text-white text-center font-semibold">
-              Ubícate dentro de la silueta con buena iluminación
+              {isReadyToCapture 
+                ? '¡Perfecto! Captura ahora.' 
+                : (!isStable ? 'Mantén el teléfono quieto...' : 'Mantén el teléfono recto...')}
             </Text>
           </View>
 
@@ -252,10 +291,15 @@ export default function AssistedCamera({ navigation }) {
 
             {/* Botón de Captura */}
             <TouchableOpacity
-              className="w-20 h-20 rounded-full border-4 border-white bg-indigo-500 items-center justify-center shadow-lg shadow-indigo-500/50"
+              className={`w-20 h-20 rounded-full border-4 items-center justify-center ${
+                isReadyToCapture 
+                  ? 'border-white bg-indigo-500 shadow-lg shadow-indigo-500/50' 
+                  : 'border-neutral-700 bg-neutral-600 shadow-none'
+              }`}
               onPress={handleCapture}
+              disabled={!isReadyToCapture || isProcessing}
             >
-              <View className="w-14 h-14 rounded-full bg-white" />
+              <View className={`w-14 h-14 rounded-full ${isReadyToCapture ? 'bg-white' : 'bg-neutral-400'}`} />
             </TouchableOpacity>
 
             {/* Botón de Voltear Cámara */}

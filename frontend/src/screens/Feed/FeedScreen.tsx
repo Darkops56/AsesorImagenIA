@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Swiper from 'react-native-deck-swiper';
@@ -30,16 +30,28 @@ export default function FeedScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [swipedAll, setSwipedAll] = useState(false);
 
+  // Referencia para evitar bucles infinitos al limpiar seedPrendaId en React Navigation
+  const processedSeedRef = useRef<string | null>(null);
+
   useFocusEffect(
     useCallback(() => {
+      // Si la semilla ya fue procesada y ahora es undefined, significa que acabamos de limpiarla
+      // Evitamos llamar de nuevo a la API para no deshacer el ordenamiento forzado
+      if (!seedPrendaId && processedSeedRef.current !== null) {
+        processedSeedRef.current = null;
+        return;
+      }
+
       if (user) {
+        if (seedPrendaId) {
+          processedSeedRef.current = seedPrendaId;
+        }
         setLoading(true);
         fetchPrendas();
       }
       
       if (seedPrendaId || seedCategoria) {
         console.log(`[PIVOT FEED] Recibido seedPrendaId: ${seedPrendaId}, seedCategoria: ${seedCategoria}`);
-        // Futura lógica para buscar prendas similares basadas en esta semilla
       }
     }, [user, seedPrendaId, seedCategoria])
   );
@@ -52,6 +64,10 @@ export default function FeedScreen({ route, navigation }: any) {
         
       if (user?._id) {
         url += url.includes('?') ? `&usuario_id=${user._id}` : `?usuario_id=${user._id}`;
+      }
+
+      if (seedPrendaId) {
+        url += url.includes('?') ? `&seed_id=${seedPrendaId}` : `?seed_id=${seedPrendaId}`;
       }
       
       const response = await fetch(url);
@@ -66,7 +82,20 @@ export default function FeedScreen({ route, navigation }: any) {
         if (seedIndex > -1) {
           const [seedItem] = data.splice(seedIndex, 1);
           data.unshift(seedItem);
+        } else {
+          // Si no está en la lista (por filtros o interacción previa), la buscamos directamente
+          try {
+            const seedResponse = await fetch(`${NODE_API_URL}/api/prendas/${seedPrendaId}`);
+            if (seedResponse.ok) {
+              const seedItem = await seedResponse.json();
+              data.unshift(seedItem);
+            }
+          } catch (err) {
+            console.error('Error fetching specific seed prenda:', err);
+          }
         }
+        // Limpiamos los parámetros de navegación para evitar persistencia molesta al cambiar de pestaña
+        navigation.setParams({ seedPrendaId: undefined, seedCategoria: undefined });
       }
       
       setPrendas(data);
