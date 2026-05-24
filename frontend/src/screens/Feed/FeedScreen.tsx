@@ -149,7 +149,7 @@ export default function FeedScreen({ route, navigation }: any) {
     return (
       <View className="flex-1 mt-4 mb-20 bg-slate-800 rounded-3xl shadow-lg overflow-hidden border border-slate-700">
         <Image
-          source={{ uri: prenda.metadata?.url_imagen || 'https://via.placeholder.com/400x600' }}
+          source={{ uri: prenda.metadata?.url_imagen ? (prenda.metadata.url_imagen.startsWith('http') ? prenda.metadata.url_imagen : `${NODE_API_URL}${prenda.metadata.url_imagen}`) : 'https://via.placeholder.com/400x600' }}
           className="w-full h-3/5"
           resizeMode="cover"
         />

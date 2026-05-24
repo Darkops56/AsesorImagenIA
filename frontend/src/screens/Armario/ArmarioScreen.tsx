@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect, useContext } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, Modal, SafeAreaView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image, Modal, SafeAreaView, Dimensions, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import FormularioPrendaPropia from '../../components/FormularioPrendaPropia';
 import { AuthContext } from '../../context/AuthContext';
 import { NODE_API_URL } from '../../../config/config';
 
@@ -23,11 +25,20 @@ interface Prenda {
 interface Outfit {
   _id: string;
   usuario_id: string;
-  prenda_superior_id: any;
-  prenda_inferior_id: any;
+  prendas_base: any[];
+  prendas_outer: any[];
+  prenda_inferior: any;
+  calzado: any;
+  accesorios: any[];
 }
 
 const FALLBACK_IMAGE = 'https://via.placeholder.com/300x400/333333/FFFFFF?text=Sin+Imagen';
+
+const getFullImageUrl = (url?: string) => {
+  if (!url) return FALLBACK_IMAGE;
+  if (url.startsWith('http')) return url;
+  return `${NODE_API_URL}${url}`;
+};
 
 export default function ArmarioScreen() {
   const { user } = useContext(AuthContext);
@@ -37,6 +48,7 @@ export default function ArmarioScreen() {
   const [looks, setLooks] = useState<Outfit[]>([]);
   const [selectedPrenda, setSelectedPrenda] = useState<Prenda | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   
   const currentData = activeTab === 'favoritas' ? favoritas : activeTab === 'descartadas' ? descartadas : looks;
 
@@ -62,7 +74,7 @@ export default function ArmarioScreen() {
         prenda_id: int.prenda.id,
         nombre: int.prenda.nombre,
         categoria: int.prenda.categoria,
-        imagen: int.prenda.imagen,
+        imagen: getFullImageUrl(int.prenda.metadata?.url_imagen || int.prenda.imagen),
         detalles: int.prenda.detalles
       }));
       
@@ -71,7 +83,7 @@ export default function ArmarioScreen() {
         prenda_id: int.prenda.id,
         nombre: int.prenda.nombre,
         categoria: int.prenda.categoria,
-        imagen: int.prenda.imagen,
+        imagen: getFullImageUrl(int.prenda.metadata?.url_imagen || int.prenda.imagen),
         detalles: int.prenda.detalles
       }));
 
@@ -266,24 +278,50 @@ export default function ArmarioScreen() {
           </View>
         </View>
       </Modal>
+      {/* FAB para agregar prenda propia */}
+      <TouchableOpacity 
+        activeOpacity={0.8}
+        onPress={() => setIsModalVisible(true)}
+        className="absolute bottom-6 right-6 w-14 h-14 bg-indigo-600 rounded-full items-center justify-center shadow-lg border border-indigo-400 z-50"
+      >
+        <Ionicons name="add" size={32} color="#fff" />
+      </TouchableOpacity>
+
+      <FormularioPrendaPropia 
+        visible={isModalVisible} 
+        onClose={() => setIsModalVisible(false)} 
+        onSuccess={() => fetchData()} 
+      />
     </SafeAreaView>
   );
 }
 
 // Componente OutfitCard para la pestaña Mis Looks
 const OutfitCard = ({ item, onRemove }: { item: Outfit, onRemove: () => void }) => {
-  const superior = item.prenda_superior_id;
-  const inferior = item.prenda_inferior_id;
+  const prendasDelLook: any[] = [];
 
-  const [imgSup, setImgSup] = useState(superior?.metadata?.url_imagen || FALLBACK_IMAGE);
-  const [imgInf, setImgInf] = useState(inferior?.metadata?.url_imagen || FALLBACK_IMAGE);
+  if (item.accesorios && item.accesorios.length > 0) {
+    item.accesorios.forEach(acc => prendasDelLook.push({ ...acc, rol: 'Accesorio' }));
+  }
+  if (item.prendas_outer && item.prendas_outer.length > 0) {
+    item.prendas_outer.forEach(out => prendasDelLook.push({ ...out, rol: 'Outer' }));
+  }
+  if (item.prendas_base && item.prendas_base.length > 0) {
+    item.prendas_base.forEach(b => prendasDelLook.push({ ...b, rol: 'Base' }));
+  }
+  if (item.prenda_inferior) {
+    prendasDelLook.push({ ...item.prenda_inferior, rol: 'Inferior' });
+  }
+  if (item.calzado) {
+    prendasDelLook.push({ ...item.calzado, rol: 'Calzado' });
+  }
 
   return (
     <View className="mb-6 bg-neutral-900/40 border border-neutral-800 rounded-2xl overflow-hidden shadow-sm p-4">
       <View className="flex-row justify-between items-center mb-4">
         <View className="flex-row items-center space-x-2">
           <Text className="text-white font-bold text-sm tracking-wider uppercase">
-            ✨ Outfit Combinado por IA
+            ✨ Outfit Multicapa por IA
           </Text>
         </View>
         <TouchableOpacity 
@@ -295,35 +333,24 @@ const OutfitCard = ({ item, onRemove }: { item: Outfit, onRemove: () => void }) 
         </TouchableOpacity>
       </View>
 
-      <View className="flex-row space-x-3 h-[280px]">
-        {/* Prenda Superior */}
-        <View className="flex-1 bg-neutral-800 rounded-xl overflow-hidden relative border border-neutral-800/50">
-           <Image 
-             source={{ uri: imgSup }}
-             onError={() => setImgSup(FALLBACK_IMAGE)}
-             className="w-full h-full"
-             resizeMode="cover"
-           />
-           <View className="absolute bottom-0 w-full p-3 bg-black/60">
-             <Text numberOfLines={1} className="text-white text-xs font-bold mb-1">{superior?.nombre || 'Superior'}</Text>
-             <Text className="text-neutral-400 text-[10px] uppercase tracking-widest">{superior?.categoria || 'CATEGORÍA'}</Text>
-           </View>
-        </View>
-
-        {/* Prenda Inferior */}
-        <View className="flex-1 bg-neutral-800 rounded-xl overflow-hidden relative border border-neutral-800/50">
-           <Image 
-             source={{ uri: imgInf }}
-             onError={() => setImgInf(FALLBACK_IMAGE)}
-             className="w-full h-full"
-             resizeMode="cover"
-           />
-           <View className="absolute bottom-0 w-full p-3 bg-black/60">
-             <Text numberOfLines={1} className="text-white text-xs font-bold mb-1">{inferior?.nombre || 'Inferior'}</Text>
-             <Text className="text-neutral-400 text-[10px] uppercase tracking-widest">{inferior?.categoria || 'CATEGORÍA'}</Text>
-           </View>
-        </View>
-      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+        {prendasDelLook.map((prenda, idx) => {
+          const imageUrl = getFullImageUrl(prenda?.metadata?.url_imagen || prenda?.imagen);
+          return (
+            <View key={idx} className="w-32 h-48 bg-neutral-800 rounded-xl overflow-hidden relative border border-neutral-800/50 mr-3">
+              <Image 
+                source={{ uri: imageUrl }}
+                className="w-full h-full"
+                resizeMode="cover"
+              />
+              <View className="absolute bottom-0 w-full p-2 bg-black/70">
+                <Text numberOfLines={1} className="text-white text-[10px] font-bold mb-0.5">{prenda.nombre || 'Prenda'}</Text>
+                <Text className="text-indigo-300 text-[9px] uppercase tracking-widest">{prenda.rol}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 };

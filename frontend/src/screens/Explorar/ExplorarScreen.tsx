@@ -31,6 +31,9 @@ export default function ExplorarScreen({ navigation }: any) {
   const [activeCategory, setActiveCategory] = useState('Todo');
   const [prendas, setPrendas] = useState<Prenda[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const flatListRef = React.useRef<FlatList>(null);
 
   // Estados para controlar prendas ya interactuadas
   const [interacciones, setInteracciones] = useState<any[]>([]);
@@ -59,23 +62,35 @@ export default function ExplorarScreen({ navigation }: any) {
   );
 
   useEffect(() => {
+    setPage(1);
     const delayDebounceFn = setTimeout(() => {
-      fetchResultados();
+      fetchResultados(1);
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, activeCategory]);
 
-  const fetchResultados = async () => {
+  useEffect(() => {
+    if (page > 1) {
+       fetchResultados(page);
+    }
+  }, [page]);
+
+  const fetchResultados = async (pageNum = page) => {
     setLoading(true);
     try {
-      let url = `${NODE_API_URL}/api/prendas/search?categoria=${activeCategory}`;
+      let url = `${NODE_API_URL}/api/prendas/search?categoria=${activeCategory}&page=${pageNum}`;
       if (searchQuery.trim() !== '') {
         url += `&q=${encodeURIComponent(searchQuery)}`;
       }
       const response = await fetch(url);
       const data = await response.json();
       setPrendas(data);
+      setHasMore(data.length === 50);
+      
+      if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({ animated: true, offset: 0 });
+      }
     } catch (error) {
       console.error('Error fetching search results:', error);
     } finally {
@@ -154,15 +169,15 @@ export default function ExplorarScreen({ navigation }: any) {
         }}
       >
         <Image 
-          source={{ uri: item.metadata?.url_imagen || 'https://via.placeholder.com/200x300' }} 
+          source={{ uri: item.metadata?.url_imagen ? (item.metadata.url_imagen.startsWith('http') ? item.metadata.url_imagen : `${NODE_API_URL}${item.metadata.url_imagen}`) : 'https://via.placeholder.com/200x300' }}
           className="w-full h-48"
           resizeMode="cover"
         />
         
         {isMatch && (
-          <View className="absolute top-2 left-2 px-2 py-1 bg-indigo-500/90 rounded-full flex-row items-center border border-indigo-300">
-            <Text className="text-white text-xs font-bold mr-1">Match IA</Text>
-            <Ionicons name="sparkles" size={12} color="#fcd34d" />
+          <View className="absolute top-2 left-2 z-10 flex-row items-center bg-indigo-600/90 rounded-full px-2 py-1 shadow-lg border border-indigo-400/50">
+            <Ionicons name="sparkles" size={10} color="#fcd34d" />
+            <Text className="text-white text-xs font-bold ml-1">AI</Text>
           </View>
         )}
 
@@ -186,6 +201,30 @@ export default function ExplorarScreen({ navigation }: any) {
       </TouchableOpacity>
     );
   };
+
+  const PaginationControls = () => (
+    <View className="flex-row justify-between items-center py-6 px-2">
+      <TouchableOpacity 
+        onPress={() => setPage(p => Math.max(1, p - 1))}
+        disabled={page === 1}
+        className={`flex-row items-center px-4 py-2 rounded-full border ${page === 1 ? 'border-slate-700 bg-slate-800/50' : 'border-indigo-500 bg-slate-800'}`}
+      >
+        <Ionicons name="chevron-back" size={16} color={page === 1 ? '#475569' : '#818cf8'} />
+        <Text className={`ml-2 font-bold ${page === 1 ? 'text-slate-500' : 'text-indigo-400'}`}>Anterior</Text>
+      </TouchableOpacity>
+      
+      <Text className="text-slate-400 text-xs font-bold uppercase tracking-widest">Página {page}</Text>
+      
+      <TouchableOpacity 
+        onPress={() => setPage(p => p + 1)}
+        disabled={!hasMore}
+        className={`flex-row items-center px-4 py-2 rounded-full border ${!hasMore ? 'border-slate-700 bg-slate-800/50' : 'border-indigo-500 bg-slate-800'}`}
+      >
+        <Text className={`mr-2 font-bold ${!hasMore ? 'text-slate-500' : 'text-indigo-400'}`}>Siguiente</Text>
+        <Ionicons name="chevron-forward" size={16} color={!hasMore ? '#475569' : '#818cf8'} />
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View className="flex-1 bg-slate-900 pt-12 px-4">
@@ -230,12 +269,15 @@ export default function ExplorarScreen({ navigation }: any) {
         </View>
       ) : (
         <FlatList 
+          ref={flatListRef}
           data={prendas}
           keyExtractor={(item) => item._id}
           numColumns={2}
           renderItem={renderItem}
           contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={prendas.length > 0 ? <PaginationControls /> : null}
+          ListFooterComponent={prendas.length > 0 ? <PaginationControls /> : null}
           ListEmptyComponent={
             <View className="flex-1 justify-center items-center mt-20">
               <Ionicons name="shirt-outline" size={60} color="#475569" />
@@ -274,7 +316,7 @@ export default function ExplorarScreen({ navigation }: any) {
                 {/* Contenido Principal: Imagen e Info */}
                 <View className="flex-row items-start space-x-4">
                   <Image 
-                    source={{ uri: selectedPrenda.metadata?.url_imagen || 'https://via.placeholder.com/200x300' }} 
+                    source={{ uri: selectedPrenda.metadata?.url_imagen ? (selectedPrenda.metadata.url_imagen.startsWith('http') ? selectedPrenda.metadata.url_imagen : `${NODE_API_URL}${selectedPrenda.metadata.url_imagen}`) : 'https://via.placeholder.com/200x300' }} 
                     className="w-32 h-48 rounded-xl bg-slate-800"
                     resizeMode="cover"
                   />

@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const prendaSchema = new mongoose.Schema({
   id_prenda: { type: String, required: true, unique: true },
+  is_user_owned: { type: Boolean, default: false },
+  usuario_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
   nombre: { type: String, required: true },
   categoria: { type: String, required: true }, // Superior, Inferior, Calzado, Accesorio
   atributos_diseno: {

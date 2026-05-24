@@ -1,12 +1,71 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const Prenda = require('../models/Prenda');
 const UsuarioInteraccion = require('../models/UsuarioInteraccion');
+const authMiddleware = require('../middleware/authMiddleware');
+
+// POST /api/prendas/user-owned - Carga prenda propia de usuario
+router.post('/user-owned', authMiddleware, async (req, res) => {
+  try {
+    const { nombre, categoria, atributos_diseno, metadata, image_base64 } = req.body;
+    const usuario_id = req.user._id;
+
+    if (!image_base64) {
+      return res.status(400).json({ error: 'Falta la imagen en Base64' });
+    }
+
+    const uploadsDir = path.join(__dirname, '../../public/uploads/usuario_ropa');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const base64Data = image_base64.replace(/^data:image\/\w+;base64,/, '');
+    const filename = `${usuario_id}_${Date.now()}.jpg`;
+    const filePath = path.join(uploadsDir, filename);
+
+    fs.writeFileSync(filePath, base64Data, 'base64');
+    const url_imagen = `/uploads/usuario_ropa/${filename}`;
+
+    const nuevaPrenda = new Prenda({
+      id_prenda: `USR-${Date.now()}`,
+      nombre: nombre || 'Mi Prenda',
+      categoria: categoria || 'Superior',
+      is_user_owned: true,
+      usuario_id,
+      atributos_diseno: atributos_diseno || { corte: 'Regular', tipo_cuello: 'Desconocido', volumen: 'Normal' },
+      tags_compatibilidad: ['Universal'],
+      siluetas_compatibles: ['Universal'],
+      metadata: {
+        color_dominante: metadata?.color_dominante || 'Neutro',
+        url_imagen
+      }
+    });
+
+    const prendaGuardada = await nuevaPrenda.save();
+
+    const nuevaInteraccion = new UsuarioInteraccion({
+      usuario_id,
+      prenda_id: prendaGuardada._id,
+      tipo_interaccion: 'LIKE'
+    });
+    await nuevaInteraccion.save();
+
+    res.status(201).json({ message: 'Prenda guardada exitosamente', prenda: prendaGuardada });
+  } catch (error) {
+    console.error('❌ Error guardando prenda propia:', error);
+    res.status(500).json({ error: 'Error interno guardando prenda' });
+  }
+});
 
 // GET /api/prendas/search - Búsqueda flexible
 router.get('/search', async (req, res) => {
   try {
-    const { q, categoria, color } = req.query;
+    const { q, categoria, color, page = 1 } = req.query;
+    const limit = 50;
+    const skip = (parseInt(page) - 1) * limit;
+    
     let query = {};
 
     if (q) {
@@ -21,7 +80,7 @@ router.get('/search', async (req, res) => {
       query['metadata.color_dominante'] = { $regex: color, $options: 'i' };
     }
 
-    const prendas = await Prenda.find(query).limit(50);
+    const prendas = await Prenda.find(query).skip(skip).limit(limit);
     res.status(200).json(prendas);
   } catch (error) {
     console.error('❌ Error en búsqueda de prendas:', error);
