@@ -59,10 +59,24 @@ router.post('/user-owned', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/prendas/maintenance/fix-calzado - Mantenimiento: Corregir categoría calzado
+router.post('/maintenance/fix-calzado', async (req, res) => {
+  try {
+    const regex = /shoes|sneakers|footwear|flip flops/i;
+    const resultado = await Prenda.updateMany(
+      { nombre: { $regex: regex }, categoria: { $ne: 'Calzado' } },
+      { $set: { categoria: 'Calzado' } }
+    );
+    res.status(200).json({ message: 'Prendas actualizadas a categoría Calzado', resultado });
+  } catch (error) {
+    console.error('❌ Error en fix-calzado:', error);
+    res.status(500).json({ error: 'Error interno en mantenimiento de calzado' });
+  }
+});
 // GET /api/prendas/search - Búsqueda flexible
 router.get('/search', async (req, res) => {
   try {
-    const { q, categoria, color, page = 1 } = req.query;
+    const { q, categoria, color, silueta, page = 1 } = req.query;
     const limit = 50;
     const skip = (parseInt(page) - 1) * limit;
     
@@ -80,7 +94,17 @@ router.get('/search', async (req, res) => {
       query['metadata.color_dominante'] = { $regex: color, $options: 'i' };
     }
 
-    const prendas = await Prenda.find(query).skip(skip).limit(limit);
+    let prendas = await Prenda.find(query).skip(skip).limit(limit);
+
+    if (silueta) {
+      const siluetaRegex = new RegExp(`^${silueta}$`, 'i');
+      prendas.sort((a, b) => {
+        const aCompat = a.siluetas_compatibles?.some(s => siluetaRegex.test(s)) ? 1 : 0;
+        const bCompat = b.siluetas_compatibles?.some(s => siluetaRegex.test(s)) ? 1 : 0;
+        return bCompat - aCompat;
+      });
+    }
+
     res.status(200).json(prendas);
   } catch (error) {
     console.error('❌ Error en búsqueda de prendas:', error);
@@ -163,6 +187,11 @@ router.get('/', async (req, res) => {
             if (p.tags_compatibilidad && prendaSemilla.tags_compatibilidad) {
               const tagsComunes = p.tags_compatibilidad.filter(tag => prendaSemilla.tags_compatibilidad.includes(tag));
               score += tagsComunes.length * 1.5;
+            }
+
+            // 5. Prioridad Absoluta a Ropa Física (+50 puntos)
+            if (p.is_user_owned === true) {
+              score += 50;
             }
 
             return { prenda: p, score };

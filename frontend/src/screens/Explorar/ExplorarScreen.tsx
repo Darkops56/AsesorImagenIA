@@ -83,6 +83,9 @@ export default function ExplorarScreen({ navigation }: any) {
       if (searchQuery.trim() !== '') {
         url += `&q=${encodeURIComponent(searchQuery)}`;
       }
+      if (user?.silueta_detectada) {
+        url += `&silueta=${encodeURIComponent(user.silueta_detectada)}`;
+      }
       const response = await fetch(url);
       const data = await response.json();
       setPrendas(data);
@@ -160,12 +163,8 @@ export default function ExplorarScreen({ navigation }: any) {
       <TouchableOpacity 
         className="flex-1 m-2 bg-slate-800 rounded-2xl overflow-hidden border border-slate-700"
         onPress={() => {
-          if (interaccionPrenda) {
-            setSelectedPrenda(item);
-            setSelectedInteraccion(interaccionPrenda);
-          } else {
-            navigation.navigate('Feed', { seedPrendaId: item._id, seedCategoria: item.categoria });
-          }
+          setSelectedPrenda(item);
+          setSelectedInteraccion(interaccionPrenda || null);
         }}
       >
         <Image 
@@ -287,9 +286,9 @@ export default function ExplorarScreen({ navigation }: any) {
         />
       )}
 
-      {/* Modal de Detalle para Prenda ya Interactuada (Estilo Armario Premium) */}
+      {/* Modal de Detalle para Prenda (Estilo Armario Premium) */}
       <Modal
-        visible={!!selectedPrenda && !!selectedInteraccion}
+        visible={!!selectedPrenda}
         transparent={true}
         animationType="slide"
         onRequestClose={() => {
@@ -307,7 +306,7 @@ export default function ExplorarScreen({ navigation }: any) {
             }} 
           />
           <View className="bg-slate-900 rounded-t-3xl border-t border-slate-800 p-6 min-h-[55%]">
-            {selectedPrenda && selectedInteraccion && (
+            {selectedPrenda && (
               <>
                 <View className="items-center mb-6">
                   <View className="w-12 h-1 bg-slate-700 rounded-full" />
@@ -330,24 +329,26 @@ export default function ExplorarScreen({ navigation }: any) {
                     </Text>
 
                     {/* Indicador de Estado en Armario */}
-                    <View className="flex-row items-center mb-4">
-                      <View className={`px-3 py-1 rounded-full flex-row items-center border ${
-                        selectedInteraccion.tipo_interaccion === 'LIKE' 
-                          ? 'bg-emerald-500/10 border-emerald-500/30' 
-                          : 'bg-rose-500/10 border-rose-500/30'
-                      }`}>
-                        <Ionicons 
-                          name={selectedInteraccion.tipo_interaccion === 'LIKE' ? 'heart' : 'close-circle'} 
-                          size={14} 
-                          color={selectedInteraccion.tipo_interaccion === 'LIKE' ? '#10b981' : '#f43f5e'} 
-                        />
-                        <Text className={`text-xs font-bold ml-1.5 ${
-                          selectedInteraccion.tipo_interaccion === 'LIKE' ? 'text-emerald-400' : 'text-rose-400'
+                    {selectedInteraccion && (
+                      <View className="flex-row items-center mb-4">
+                        <View className={`px-3 py-1 rounded-full flex-row items-center border ${
+                          selectedInteraccion.tipo_interaccion === 'LIKE' 
+                            ? 'bg-emerald-500/10 border-emerald-500/30' 
+                            : 'bg-rose-500/10 border-rose-500/30'
                         }`}>
-                          {selectedInteraccion.tipo_interaccion === 'LIKE' ? 'Guardado en Favoritos' : 'Guardado en Descartados'}
-                        </Text>
+                          <Ionicons 
+                            name={selectedInteraccion.tipo_interaccion === 'LIKE' ? 'heart' : 'close-circle'} 
+                            size={14} 
+                            color={selectedInteraccion.tipo_interaccion === 'LIKE' ? '#10b981' : '#f43f5e'} 
+                          />
+                          <Text className={`text-xs font-bold ml-1.5 ${
+                            selectedInteraccion.tipo_interaccion === 'LIKE' ? 'text-emerald-400' : 'text-rose-400'
+                          }`}>
+                            {selectedInteraccion.tipo_interaccion === 'LIKE' ? 'Guardado en Favoritos' : 'Guardado en Descartados'}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
+                    )}
                     
                     {/* Detalles */}
                     <View className="space-y-2">
@@ -375,60 +376,75 @@ export default function ExplorarScreen({ navigation }: any) {
 
                 {/* Acciones */}
                 <View className="mt-8 space-y-3">
-                  {/* Botón dinámico para cambiar de estado */}
-                  <TouchableOpacity 
-                    disabled={updatingInteraccion}
-                    onPress={handleToggleInteraccion}
-                    className={`py-4 rounded-xl items-center border flex-row justify-center active:opacity-90 ${
-                      selectedInteraccion.tipo_interaccion === 'LIKE' 
-                        ? 'bg-slate-800 border-slate-700' 
-                        : 'bg-indigo-600 border-indigo-500'
-                    }`}
-                  >
-                    {updatingInteraccion ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                      <>
-                        <Ionicons 
-                          name={selectedInteraccion.tipo_interaccion === 'LIKE' ? 'close-circle-outline' : 'heart-outline'} 
-                          size={18} 
-                          color="#ffffff" 
-                        />
-                        <Text className="text-white font-bold text-base ml-2">
-                          {selectedInteraccion.tipo_interaccion === 'LIKE' ? 'Mover a Descartados' : 'Mover a Favoritos'}
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                  {selectedInteraccion ? (
+                    <>
+                      {/* Botón dinámico para cambiar de estado */}
+                      <TouchableOpacity 
+                        disabled={updatingInteraccion}
+                        onPress={handleToggleInteraccion}
+                        className={`py-4 rounded-xl items-center border flex-row justify-center active:opacity-90 ${
+                          selectedInteraccion.tipo_interaccion === 'LIKE' 
+                            ? 'bg-slate-800 border-slate-700' 
+                            : 'bg-indigo-600 border-indigo-500'
+                        }`}
+                      >
+                        {updatingInteraccion ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <>
+                            <Ionicons 
+                              name={selectedInteraccion.tipo_interaccion === 'LIKE' ? 'close-circle-outline' : 'heart-outline'} 
+                              size={18} 
+                              color="#ffffff" 
+                            />
+                            <Text className="text-white font-bold text-base ml-2">
+                              {selectedInteraccion.tipo_interaccion === 'LIKE' ? 'Mover a Descartados' : 'Mover a Favoritos'}
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
 
-                  {/* Botón para navegar al Armario */}
-                  <TouchableOpacity 
-                    onPress={() => {
-                      setSelectedPrenda(null);
-                      setSelectedInteraccion(null);
-                      navigation.navigate('Armario');
-                    }}
-                    className="py-4 rounded-xl bg-slate-800 border border-slate-700 items-center flex-row justify-center active:bg-slate-700"
-                  >
-                    <Ionicons name="shirt-outline" size={18} color="#818cf8" />
-                    <Text className="text-indigo-300 font-bold text-base ml-2">Ver en mi Armario</Text>
-                  </TouchableOpacity>
+                      {/* Botón para navegar al Armario */}
+                      <TouchableOpacity 
+                        onPress={() => {
+                          setSelectedPrenda(null);
+                          setSelectedInteraccion(null);
+                          navigation.navigate('Armario');
+                        }}
+                        className="py-4 rounded-xl bg-slate-800 border border-slate-700 items-center flex-row justify-center active:bg-slate-700"
+                      >
+                        <Ionicons name="shirt-outline" size={18} color="#818cf8" />
+                        <Text className="text-indigo-300 font-bold text-base ml-2">Ver en mi Armario</Text>
+                      </TouchableOpacity>
 
-                  {/* Botón para eliminar interacción de la colección */}
-                  <TouchableOpacity 
-                    disabled={updatingInteraccion}
-                    onPress={handleRemoveInteraccion}
-                    className="py-4 rounded-xl bg-red-500/10 border border-red-500/30 items-center flex-row justify-center active:bg-red-500/20"
-                  >
-                    {updatingInteraccion ? (
-                      <ActivityIndicator size="small" color="#f87171" />
-                    ) : (
-                      <>
-                        <Ionicons name="trash-outline" size={18} color="#f87171" />
-                        <Text className="text-red-400 font-bold text-base ml-2">Eliminar de la colección</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                      {/* Botón para eliminar interacción de la colección */}
+                      <TouchableOpacity 
+                        disabled={updatingInteraccion}
+                        onPress={handleRemoveInteraccion}
+                        className="py-4 rounded-xl bg-red-500/10 border border-red-500/30 items-center flex-row justify-center active:bg-red-500/20"
+                      >
+                        {updatingInteraccion ? (
+                          <ActivityIndicator size="small" color="#f87171" />
+                        ) : (
+                          <>
+                            <Ionicons name="trash-outline" size={18} color="#f87171" />
+                            <Text className="text-red-400 font-bold text-base ml-2">Eliminar de la colección</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedPrenda(null);
+                        setSelectedInteraccion(null);
+                        navigation.navigate('Feed', { seedPrendaId: selectedPrenda._id, seedCategoria: selectedPrenda.categoria });
+                      }}
+                      className="bg-indigo-600 py-3 rounded-xl items-center flex-row justify-center active:bg-indigo-700"
+                    >
+                      <Text className="text-white font-bold text-base">🎯 Ver combinaciones en mi Feed</Text>
+                    </TouchableOpacity>
+                  )}
 
                   {/* Botón de cerrar */}
                   <TouchableOpacity 
